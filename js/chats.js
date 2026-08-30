@@ -62,6 +62,7 @@ function newChat() {
   activeChatId = null;
   localStorage.removeItem("active_chat_id");
   resetWelcome();
+  resetScrollPin();
   renderSidebar();
   syncChatPromptUI();
   closeSidebar();
@@ -108,6 +109,7 @@ function loadChat(id) {
       ? addUserMsg(m.content, i, false, m.images, m.files)
       : addAssistantMsg(m, i);
   });
+  resetScrollPin();
   renderSidebar();
   syncChatPromptUI();
   scrollToBottom();
@@ -128,6 +130,7 @@ function clearChat() {
     saveChats();
   }
   resetWelcome();
+  resetScrollPin();
   renderSidebar();
 }
 

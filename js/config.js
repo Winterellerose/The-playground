@@ -3,7 +3,8 @@
 
 "use strict";
 /* ════════════════════════════════════════════════════════════
-   THE PLAYGROUND v2.9.3 — multi-provider AI studio (single file)
+   THE PLAYGROUND v2.9.4 — multi-provider AI studio (single file)
+   v2.9.4: sticky scroll — auto-scroll pauses when you scroll up to reread during a stream; a ↓ Latest pill returns to the newest message. Sending, regenerating or switching chats re-engages the chase.
    v2.9.3: accessibility — every icon-only control carries a real
    accessible name (aria-label); the landing, model cards, sidebar rows,
    picker sections and thinking disclosures are keyboard focusable and

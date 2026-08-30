@@ -23,9 +23,16 @@ const ACT = {
   "export-chats": () => exportChats(),
   "import-chats": () => $("importFile").click(),
   "clear-chat": () => clearChat(),
-  attach: () => attachClick(),
+  "attach": () => attachClick(),
   "test-key": (b) => testKey(b.dataset.pid),
+  "jump-latest": () => jumpToLatest(),
 };
+
+/* ── Sticky scroll: track reader position on the chat scroll area ── */
+function bindScrollTracking() {
+  if (!scrollArea) return;
+  scrollArea.addEventListener("scroll", syncScrollPinned, { passive: true });
+}
 
 /* Named handlers extracted from listeners that used to be bound inline
    next to each feature. */
@@ -94,6 +101,10 @@ function bindEvents() {
   $("importFile").addEventListener("change", (e) => {
     importChats(e.target);
   });
+  bindScrollTracking();
+  $("scrollJump").addEventListener("click", () =>
+    ACT["jump-latest"](),
+  );
   $("imgFile").addEventListener("change", (e) => {
     addAttachFiles(e.target.files);
     e.target.value = "";

@@ -146,6 +146,7 @@ function regenerate(idx) {
   if (!m || m.role !== "assistant") return;
   stopStream();
   removeFrom(idx);
+  resetScrollPin(); // a fresh answer the user asked for → re-engage auto-scroll
   runCompletion(c, idx);
 }
 function removeFrom(idx) {

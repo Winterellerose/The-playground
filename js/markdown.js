@@ -271,6 +271,54 @@ function highlight(el) {
     }
   });
 }
+/* ── Sticky scroll (v2.9.4): auto-scroll only while the reader is at the
+   bottom. Scrolling up — to reread while an answer streams — pauses the
+   chase and shows the ↓ Latest pill; returning to the bottom, clicking the
+   pill, sending a message, or switching chats resumes it. Direction-aware:
+   only real upward scrolls unpin, so programmatic jumps and content growth
+   (streaming chunks) can never false-trigger it. */
+let scrollPinned = true;
+let scrollJumpGuard = 0; // ignore scroll events right after programmatic jumps
+let lastScrollTop = 0;
+function nearScrollBottom() {
+  if (!scrollArea) return true;
+  return (
+    scrollArea.scrollHeight - scrollArea.scrollTop - scrollArea.clientHeight <
+    80
+  );
+}
+function syncScrollPinned() {
+  if (!scrollArea) return;
+  const st = scrollArea.scrollTop;
+  if (performance.now() >= scrollJumpGuard) {
+    const dir = st - lastScrollTop;
+    if (dir < -2) scrollPinned = false; // user scrolled up → pause the chase
+    else if (dir > 2 || nearScrollBottom())
+      scrollPinned = nearScrollBottom(); // moving down or idle → pin iff at bottom
+    // dir ≈ 0 (content resized under us) → keep current state
+  }
+  lastScrollTop = st;
+  const pill = $("scrollJump");
+  if (pill) pill.hidden = scrollPinned;
+}
 function scrollToBottom() {
-  scrollArea.scrollTop = scrollArea.scrollHeight;
+  if (!scrollPinned || !scrollArea) return; // reader is rereading — don't yank
+  scrollJumpGuard = performance.now() + 300;
+  scrollArea.scrollTo({ top: scrollArea.scrollHeight, behavior: "instant" });
+}
+function jumpToLatest() {
+  scrollPinned = true;
+  const pill = $("scrollJump");
+  if (pill) pill.hidden = true;
+  if (!scrollArea) return;
+  scrollJumpGuard = performance.now() + 300;
+  lastScrollTop = scrollArea.scrollHeight;
+  scrollArea.scrollTo({ top: scrollArea.scrollHeight, behavior: "instant" });
+}
+function resetScrollPin() {
+  scrollPinned = true;
+  const pill = $("scrollJump");
+  if (pill) pill.hidden = true;
+  scrollJumpGuard = 0;
+  if (scrollArea) lastScrollTop = scrollArea.scrollTop;
 }

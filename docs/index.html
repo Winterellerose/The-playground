@@ -3590,6 +3590,11 @@ header {
     border-radius: 16px;
   }
 }
+/* ── Sticky scroll: ↓ Latest pill (v2.9.4) ── */
+.input-area{position:relative}
+.scroll-jump{position:absolute;bottom:calc(100% - 6px);left:50%;transform:translateX(-50%);display:inline-flex;align-items:center;gap:4px;background:var(--surface3);border:1px solid var(--border-strong);color:var(--text);border-radius:16px;padding:5px 14px;font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;z-index:30;box-shadow:0 4px 16px rgba(0,0,0,0.45);transition:all 0.15s}
+.scroll-jump:hover{border-color:var(--free);color:var(--free)}
+.scroll-jump[hidden]{display:none}
 
 </style>
 </head>
@@ -3601,7 +3606,7 @@ header {
     <div class="landing-label">Initializing</div>
     <h1 class="landing-title">The <em>playground.</em></h1>
     <div class="landing-bar"><div class="landing-bar-fill"></div></div>
-    <div class="landing-meta"><span>Preparing studio</span><span>v2.9.3</span></div>
+    <div class="landing-meta"><span>Preparing studio</span><span>v2.9.4</span></div>
     <div class="landing-enter">Press to enter</div>
   </div>
 </div>
@@ -3756,6 +3761,7 @@ header {
 </div>
 
 <div class="input-area">
+  <button class="scroll-jump" id="scrollJump" data-act="jump-latest" hidden aria-label="Jump to latest message">↓ Latest</button>
   <div class="preview-strip" id="previewStrip"></div>
   <div class="input-row">
     <button class="attach-btn" id="attachBtn" data-act="attach" title="Attach files or images" aria-label="Attach files or images"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg></button>
@@ -3777,7 +3783,8 @@ header {
 
 "use strict";
 /* ════════════════════════════════════════════════════════════
-   THE PLAYGROUND v2.9.3 — multi-provider AI studio (single file)
+   THE PLAYGROUND v2.9.4 — multi-provider AI studio (single file)
+   v2.9.4: sticky scroll — auto-scroll pauses when you scroll up to reread during a stream; a ↓ Latest pill returns to the newest message. Sending, regenerating or switching chats re-engages the chase.
    v2.9.3: accessibility — every icon-only control carries a real
    accessible name (aria-label); the landing, model cards, sidebar rows,
    picker sections and thinking disclosures are keyboard focusable and
@@ -5120,8 +5127,56 @@ function highlight(el) {
     }
   });
 }
+/* ── Sticky scroll (v2.9.4): auto-scroll only while the reader is at the
+   bottom. Scrolling up — to reread while an answer streams — pauses the
+   chase and shows the ↓ Latest pill; returning to the bottom, clicking the
+   pill, sending a message, or switching chats resumes it. Direction-aware:
+   only real upward scrolls unpin, so programmatic jumps and content growth
+   (streaming chunks) can never false-trigger it. */
+let scrollPinned = true;
+let scrollJumpGuard = 0; // ignore scroll events right after programmatic jumps
+let lastScrollTop = 0;
+function nearScrollBottom() {
+  if (!scrollArea) return true;
+  return (
+    scrollArea.scrollHeight - scrollArea.scrollTop - scrollArea.clientHeight <
+    80
+  );
+}
+function syncScrollPinned() {
+  if (!scrollArea) return;
+  const st = scrollArea.scrollTop;
+  if (performance.now() >= scrollJumpGuard) {
+    const dir = st - lastScrollTop;
+    if (dir < -2) scrollPinned = false; // user scrolled up → pause the chase
+    else if (dir > 2 || nearScrollBottom())
+      scrollPinned = nearScrollBottom(); // moving down or idle → pin iff at bottom
+    // dir ≈ 0 (content resized under us) → keep current state
+  }
+  lastScrollTop = st;
+  const pill = $("scrollJump");
+  if (pill) pill.hidden = scrollPinned;
+}
 function scrollToBottom() {
-  scrollArea.scrollTop = scrollArea.scrollHeight;
+  if (!scrollPinned || !scrollArea) return; // reader is rereading — don't yank
+  scrollJumpGuard = performance.now() + 300;
+  scrollArea.scrollTo({ top: scrollArea.scrollHeight, behavior: "instant" });
+}
+function jumpToLatest() {
+  scrollPinned = true;
+  const pill = $("scrollJump");
+  if (pill) pill.hidden = true;
+  if (!scrollArea) return;
+  scrollJumpGuard = performance.now() + 300;
+  lastScrollTop = scrollArea.scrollHeight;
+  scrollArea.scrollTo({ top: scrollArea.scrollHeight, behavior: "instant" });
+}
+function resetScrollPin() {
+  scrollPinned = true;
+  const pill = $("scrollJump");
+  if (pill) pill.hidden = true;
+  scrollJumpGuard = 0;
+  if (scrollArea) lastScrollTop = scrollArea.scrollTop;
 }
 
 /* ═══ js/catalog.js ═══ */
@@ -6513,6 +6568,7 @@ function newChat() {
   activeChatId = null;
   localStorage.removeItem("active_chat_id");
   resetWelcome();
+  resetScrollPin();
   renderSidebar();
   syncChatPromptUI();
   closeSidebar();
@@ -6559,6 +6615,7 @@ function loadChat(id) {
       ? addUserMsg(m.content, i, false, m.images, m.files)
       : addAssistantMsg(m, i);
   });
+  resetScrollPin();
   renderSidebar();
   syncChatPromptUI();
   scrollToBottom();
@@ -6579,6 +6636,7 @@ function clearChat() {
     saveChats();
   }
   resetWelcome();
+  resetScrollPin();
   renderSidebar();
 }
 
@@ -6967,6 +7025,7 @@ function regenerate(idx) {
   if (!m || m.role !== "assistant") return;
   stopStream();
   removeFrom(idx);
+  resetScrollPin(); // a fresh answer the user asked for → re-engage auto-scroll
   runCompletion(c, idx);
 }
 function removeFrom(idx) {
@@ -7598,6 +7657,7 @@ async function sendMessage() {
   }
   renderSidebar();
   welcome.style.display = "none";
+  resetScrollPin(); // your own message → re-engage auto-scroll
   addUserMsg(
     storedText,
     c.messages.length - 1,
@@ -8016,9 +8076,16 @@ const ACT = {
   "export-chats": () => exportChats(),
   "import-chats": () => $("importFile").click(),
   "clear-chat": () => clearChat(),
-  attach: () => attachClick(),
+  "attach": () => attachClick(),
   "test-key": (b) => testKey(b.dataset.pid),
+  "jump-latest": () => jumpToLatest(),
 };
+
+/* ── Sticky scroll: track reader position on the chat scroll area ── */
+function bindScrollTracking() {
+  if (!scrollArea) return;
+  scrollArea.addEventListener("scroll", syncScrollPinned, { passive: true });
+}
 
 /* Named handlers extracted from listeners that used to be bound inline
    next to each feature. */
@@ -8087,6 +8154,10 @@ function bindEvents() {
   $("importFile").addEventListener("change", (e) => {
     importChats(e.target);
   });
+  bindScrollTracking();
+  $("scrollJump").addEventListener("click", () =>
+    ACT["jump-latest"](),
+  );
   $("imgFile").addEventListener("change", (e) => {
     addAttachFiles(e.target.files);
     e.target.value = "";

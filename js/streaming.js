@@ -468,6 +468,7 @@ async function sendMessage() {
   }
   renderSidebar();
   welcome.style.display = "none";
+  resetScrollPin(); // your own message → re-engage auto-scroll
   addUserMsg(
     storedText,
     c.messages.length - 1,
