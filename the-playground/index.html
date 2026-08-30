@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Playground — Multi-Provider AI Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/styles/github-dark-dimmed.min.css">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.11.1/highlight.min.js"></script>
+<script src="js/vendor/marked.umd.js"></script>
+<script src="js/vendor/purify.min.js"></script>
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+
+<div class="landing" id="landing" role="button" tabindex="0" aria-label="Enter the playground">
+  <div class="landing-inner">
+    <svg class="landing-prism" viewBox="0 0 60 60"><defs><linearGradient id="lg1" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#7ec8b4"/><stop offset="50%" stop-color="#d4c66a"/><stop offset="100%" stop-color="#e89c6c"/></linearGradient></defs><polygon points="30,52 6,8 54,8" fill="url(#lg1)"/></svg>
+    <div class="landing-label">Initializing</div>
+    <h1 class="landing-title">The <em>playground.</em></h1>
+    <div class="landing-bar"><div class="landing-bar-fill"></div></div>
+    <div class="landing-meta"><span>Preparing studio</span><span>v2.9.3</span></div>
+    <div class="landing-enter">Press to enter</div>
+  </div>
+</div>
+
+<div class="app">
+<aside class="sidebar" id="sidebar">
+  <div class="sb-header">
+    <button class="sb-new" data-act="new-chat"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg> New chat</button>
+    <button class="sb-icon" id="btnCloseMobile" data-act="close-sidebar" title="Close" aria-label="Close sidebar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    <button class="sb-icon" id="btnCollapse" data-act="toggle-sidebar-desktop" title="Collapse" aria-label="Collapse sidebar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="11 17 6 12 11 7"/><polyline points="18 17 13 12 18 7"/></svg></button>
+    <button class="sb-icon" id="btnSettings" data-act="open-settings" title="Settings" aria-label="Open settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 01-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg></button>
+  </div>
+  <div class="sb-search"><input id="sbSearch" placeholder="Search conversations…" aria-label="Search conversations"></div>
+  <div class="sb-list" id="sbList"></div>
+</aside>
+<div class="sidebar-overlay" id="sidebarOverlay" data-act="close-sidebar"></div>
+
+<div class="mp-overlay" id="mpOverlay" data-act="close-model-picker">
+  <div class="mp-modal" role="dialog" aria-modal="true" aria-labelledby="mpTitle" tabindex="-1">
+    <div class="mp-head"><h3 id="mpTitle">Choose a model</h3><button class="mp-close" data-act="close-model-picker" aria-label="Close model picker"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="mp-body" id="mpBody"></div>
+  </div>
+</div>
+
+<div class="st-overlay" id="stOverlay" data-act="close-settings">
+  <div class="st-modal" role="dialog" aria-modal="true" aria-labelledby="stTitle" tabindex="-1">
+    <div class="st-head"><h3 id="stTitle">Settings</h3><button class="st-close" data-act="close-settings" aria-label="Close settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="st-body">
+      <div>
+        <div class="sb-sect-label">Generation</div>
+        <div style="display:flex;flex-direction:column;gap:10px">
+          <div class="sb-field"><span>Thinking / Reasoning</span><div class="toggle on" id="thinkingToggle" data-act="toggle-thinking" role="switch" aria-checked="true" aria-label="Thinking / Reasoning" tabindex="0"></div></div>
+          <div class="sb-field"><label for="effortSelect">Effort</label><select id="effortSelect"><option value="low">low</option><option value="medium">medium</option><option value="high" selected>high</option><option value="max">max</option></select></div>
+          <div class="sb-field"><label for="tempSelect">Temperature</label><select id="tempSelect"><option value="0.3">0.3</option><option value="0.6">0.6</option><option value="0.8">0.8</option><option value="1.0" selected>1.0</option></select></div>
+          <div class="sb-field"><label for="maxTok">Max output tokens</label><input type="number" id="maxTok" value="8192" min="256" max="128000" step="256" style="width:90px"></div>
+          <div class="sb-field"><label for="extrasMode">Titles / follow-ups</label><select id="extrasMode"><option value="off">off</option><option value="free" selected>free models only</option><option value="always">always (may use credits)</option></select></div>
+        </div>
+      </div>
+
+      <div>
+        <div class="key-section-header"><span class="key-section-name free">Free APIs</span><span class="key-section-count" id="freeKeyCount">0 keys set</span></div>
+        <div id="freeKeys"></div>
+        <p class="sb-key-help">Free tiers: OpenRouter 20 RPM · Groq 30 RPM · Cerebras 30 RPM · Gemini ~10 RPM · Mistral 1 rps · Cohere trial · NVIDIA 40 RPM · DeepSeek pay-as-you-go (very cheap).</p>
+      </div>
+
+      <div>
+        <div class="key-section-header"><span class="key-section-name paid">Paid APIs</span><span class="key-section-count" id="paidKeyCount">0 keys set</span></div>
+        <div id="paidKeys"></div>
+        <p class="sb-key-help">Free keys are tried first; paid keys act as fallback when free limits hit.</p>
+      </div>
+
+      <p class="sec-note">⚠ Security: keys are stored in this browser's localStorage and sent directly from your device to each provider. Never use this file on a shared machine. Stealth/anonymous-provider models (OpenRouter has retired several, e.g. owl-alpha and ox-alpha) are run by unknown parties who may retain prompts — don't send confidential data.</p>
+
+      <div>
+        <div class="sb-sect-label">Rotation Log</div>
+        <div class="rot-log" id="rotLog"></div>
+      </div>
+
+      <div class="sb-sys">
+        <div class="sb-sect-label">System Prompt</div>
+        <textarea id="sysPrompt" placeholder="Optional system prompt…" spellcheck="false" aria-label="System prompt"></textarea>
+      </div>
+
+      <div>
+        <div class="key-section-header"><span class="key-section-name" style="color:var(--prism-a)">🌐 Web Search</span></div>
+        <p class="sb-key-help" style="margin-bottom:10px">Lets the model answer about recent/current events (past its training cutoff). Pick a free provider and paste its key — all run from your browser with generous free tiers. Add more than one and <strong>Auto</strong> tries them in order for redundancy. <strong>Default WEB mode is AUTO</strong> — it only searches for current/recent topics.</p>
+        <div class="sb-field" style="margin-bottom:8px">
+          <label for="searchProvider">Provider</label>
+          <select id="searchProvider">
+            <option value="auto">Auto (try all configured)</option>
+            <option value="tavily">Tavily — 1,000/mo free, LLM-optimized</option>
+            <option value="serper">Serper.dev — 2,500 free, Google results</option>
+            <option value="brave">Brave Search — 2,000/mo free, independent</option>
+          </select>
+        </div>
+        <div id="searchKeyFields"></div>
+        <p class="sb-key-help" style="margin-top:8px">
+          Get a free key:
+          <a href="https://tavily.com/#pricing" target="_blank" rel="noopener" style="color:var(--free)">Tavily</a> ·
+          <a href="https://serper.dev" target="_blank" rel="noopener" style="color:var(--free)">Serper</a> ·
+          <a href="https://brave.com/search/api/" target="_blank" rel="noopener" style="color:var(--free)">Brave</a>
+        </p>
+      </div>
+
+      <div>
+        <div class="sb-sect-label">Data</div>
+        <div class="sb-actions">
+          <button class="btn-sm" data-act="export-chats">Export chats (JSON)</button>
+          <button class="btn-sm" data-act="import-chats">Import chats</button>
+          <input type="file" id="importFile" accept=".json" style="display:none">
+          <button class="btn-sm danger" data-act="clear-chat">Clear chat</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Per-chat system prompt (v2.8.3): layers on top of the global prompt for one conversation only -->
+<div class="st-overlay" id="cpOverlay" data-act="close-chat-prompt">
+  <div class="st-modal" role="dialog" aria-modal="true" aria-labelledby="cpTitle" tabindex="-1">
+    <div class="st-head"><h3 id="cpTitle">Chat system prompt</h3><button class="st-close" data-act="close-chat-prompt" aria-label="Close chat system prompt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
+    <div class="st-body">
+      <div>
+        <div class="sb-sect-label">This conversation only</div>
+        <textarea id="chatSysPrompt" placeholder="e.g. Answer in plain prose, no bullet points. Push back when my premise is wrong. Always end with one follow-up question." spellcheck="false" aria-label="Chat system prompt"></textarea>
+        <p class="sb-key-help">Applies to every message in <strong>this chat</strong>, and travels with it (export/import included). It layers on top of the global system prompt in Settings — both are sent, and where they disagree this one wins. Saving from a brand-new window starts that conversation.</p>
+        <div class="sb-actions" style="margin-top:10px">
+          <button class="btn-sm danger" data-act="clear-chat-prompt">Clear</button>
+          <button class="btn-acc" data-act="save-chat-prompt">Save</button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<main class="main">
+<header>
+  <button class="hamburger" data-act="toggle-sidebar" aria-label="Toggle sidebar" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
+</header>
+
+<div class="scroll-area" id="scrollArea">
+  <div class="inner">
+    <h1 class="display-title">The <em>playground.</em></h1>
+    <div class="hero-pills">
+      <button class="pill-btn" data-act="open-model-picker"><span class="pill-key">MODEL</span><span id="heroModel">—</span></button>
+      <button class="pill-btn" data-act="open-model-picker"><span class="pill-key">CONTEXT</span><span id="heroCtx">—</span></button>
+      <button class="pill-btn" id="webSearchToggle" data-act="toggle-web-search" title="Web search — click to cycle OFF / AUTO (recent topics) / ON. Add a free Tavily/Serper/Brave key in Settings → Web Search." aria-pressed="true"><span class="pill-key">WEB</span><span id="webSearchState">AUTO</span></button>
+      <span class="status-pill free" id="statusPill"><span class="dot"></span>Free</span>
+    </div>
+    <div class="chat-frame">
+      <div class="frame-bar">
+        <div class="dots"><span></span><span></span><span></span></div>
+        <span class="frame-title">THE PLAYGROUND</span>
+        <span class="frame-meta" id="frameMeta">—</span>
+        <button class="frame-prompt" id="chatPromptBtn" data-act="open-chat-prompt" title="System prompt for THIS conversation only — layers on top of the global one from Settings"><span aria-hidden="true">📝</span><span id="chatPromptState">Prompt</span></button>
+      </div>
+      <div class="chat-wrap" id="chatWrap">
+        <div class="welcome" id="welcome">
+          <svg class="prism" viewBox="0 0 60 60"><defs><linearGradient id="lg2" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#7ec8b4"/><stop offset="50%" stop-color="#d4c66a"/><stop offset="100%" stop-color="#e89c6c"/></linearGradient></defs><polygon points="30,8 6,52 54,52" fill="url(#lg2)"/></svg>
+          <h2>How can I help you?</h2>
+          <p class="welcome-sub">Talk to <span id="welcomeModel">—</span></p>
+          <div class="suggestions">
+            <button class="suggest-btn" data-suggest="Explain quantum entanglement like I'm five, then like I'm a physicist.">Explain quantum entanglement two ways</button>
+            <button class="suggest-btn" data-suggest="Write a Python script that renames all files in a folder to kebab-case, with a dry-run flag.">Write a Python file-renamer script</button>
+            <button class="suggest-btn" data-suggest="Debug this: my JavaScript debounce function fires twice on fast clicks. Show a corrected implementation.">Debug a debounce function</button>
+            <button class="suggest-btn" data-suggest="Draft a professional but warm follow-up email after a job interview.">Draft an interview follow-up</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="input-area">
+  <div class="preview-strip" id="previewStrip"></div>
+  <div class="input-row">
+    <button class="attach-btn" id="attachBtn" data-act="attach" title="Attach files or images" aria-label="Attach files or images"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg></button>
+    <textarea id="userInput" placeholder="Send a message…" rows="1" aria-label="Message"></textarea>
+    <button class="send-btn" id="sendBtn">Send <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg></button>
+  </div>
+  <div class="input-hint" style="display:none">Enter to send · Shift+Enter newline · Tab indents · Free keys rotate automatically · Drop / paste files · images on VISION models</div>
+</div>
+<input type="file" id="imgFile" accept="image/*,.txt,.md,.markdown,.json,.csv,.js,.mjs,.cjs,.ts,.tsx,.jsx,.py,.rb,.go,.rs,.java,.c,.h,.hpp,.hh,.cpp,.cc,.cxx,.cs,.html,.htm,.css,.xml,.yml,.yaml,.sql,.sh,.bash,.zsh,.ksh" multiple style="display:none">
+<div class="drop-overlay" id="dropOverlay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg><span>Drop files or images to attach</span></div>
+</main>
+</div>
+
+<script src="js/config.js"></script>
+<script src="js/state.js"></script>
+<script src="js/utils.js"></script>
+<script src="js/markdown.js"></script>
+<script src="js/catalog.js"></script>
+<script src="js/keys.js"></script>
+<script src="js/rotation.js"></script>
+<script src="js/models.js"></script>
+<script src="js/attachments.js"></script>
+<script src="js/search.js"></script>
+<script src="js/chats.js"></script>
+<script src="js/messages.js"></script>
+<script src="js/api.js"></script>
+<script src="js/streaming.js"></script>
+<script src="js/extras.js"></script>
+<script src="js/modals.js"></script>
+<script src="js/events.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

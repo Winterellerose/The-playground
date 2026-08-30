@@ -1,0 +1,10 @@
+{
+  "name": "the-playground",
+  "version": "2.9.3",
+  "private": true,
+  "description": "Multi-provider AI studio — single-file artifact built from modular source",
+  "scripts": {
+    "build": "node build.mjs",
+    "dev": "python -m http.server 8000"
+  }
+}

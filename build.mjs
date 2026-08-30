@@ -1,0 +1,61 @@
+#!/usr/bin/env node
+'use strict';
+/* ════════════════════════════════════════════════════════════
+   build.mjs — bundles the multi-file source into the single-file
+   artifact. Zero dependencies: concatenating classic scripts in
+   load order is exactly what the browser does with the <script src>
+   tags, so dist/index.html is behavior-identical to the dev build.
+
+   Usage:  node build.mjs
+   Output: dist/index.html  (fully self-contained, file:// safe)
+   ════════════════════════════════════════════════════════════ */
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { join } from 'node:path';
+
+const ROOT = fileURLToPath(new URL('.', import.meta.url));
+const read = rel => readFileSync(join(ROOT, rel), 'utf8');
+const fail = m => { console.error('\nBUILD FAILED: ' + m + '\n'); process.exit(1) };
+
+const ORDER = ['config', 'state', 'utils', 'markdown', 'catalog', 'keys', 'rotation', 'models', 'attachments', 'search', 'chats', 'messages', 'api', 'streaming', 'extras', 'modals', 'events', 'app'];
+
+const css = read('css/app.css');
+const markedSrc = read('js/vendor/marked.umd.js');
+const purifySrc = read('js/vendor/purify.min.js');
+const hljsJs = read('js/vendor/highlight.min.js');
+const hljsCss = read('js/vendor/github-dark-dimmed.min.css');
+const appJs = ORDER.map(f => '/* ═══ js/' + f + '.js ═══ */\n' + read('js/' + f + '.js')).join('\n');
+
+/* Inlined JS must not contain the literal "</script" — it would terminate
+   the script element early. The vendored libs shipped inline in the original
+   monolith, so this should never trip; if it does, escape as <\/script. */
+for (const [name, src] of [['marked', markedSrc], ['purify', purifySrc], ['highlight', hljsJs], ['app bundle', appJs]]) {
+    if (/<\/script/i.test(src)) fail(name + ' contains "</script" — escape it as "<\\/script" before inlining');
+}
+if (/<\/style/i.test(css)) fail('app.css contains "</style"');
+if (/<\/style/i.test(hljsCss)) fail('github-dark-dimmed.min.css contains "</style"');
+
+/* Parse-check the concatenated bundle (catches ASI hazards at file seams). */
+try { new Function(appJs) } catch (e) { fail('bundled JS does not parse: ' + e.message) }
+
+let html = read('index.html');
+const swap = (tag, inline) => {
+    if (!html.includes(tag)) fail('tag not found in index.html: ' + tag.slice(0, 60));
+    html = html.replace(tag, () => inline); // function replacer: $-patterns in code stay literal
+};
+swap('<link rel="stylesheet" href="css/app.css">', '<style>\n' + css + '\n</style>');
+swap('<link rel="stylesheet" href="js/vendor/github-dark-dimmed.min.css">', '<style>\n' + hljsCss + '\n</style>');
+swap('<script src="js/vendor/highlight.min.js"></script>', '<script>\n' + hljsJs + '\n</script>');
+swap('<script src="js/vendor/marked.umd.js"></script>', '<script>\n' + markedSrc + '\n</script>');
+swap('<script src="js/vendor/purify.min.js"></script>', '<script>\n' + purifySrc + '\n</script>');
+swap(ORDER.map(f => '<script src="js/' + f + '.js"></script>').join('\n'),
+    '<!-- built from ' + ORDER.length + ' files — edit the sources, not this file -->\n<script>\n' + appJs + '\n</script>');
+
+if (/<script\s+src=/i.test(html)) fail('a <script src> tag survived inlining');
+if (/<link(?![^>]+fonts\.googleapis)[^>]+stylesheet/i.test(html)) fail('the stylesheet <link> survived inlining');
+
+mkdirSync(join(ROOT, 'dist'), { recursive: true });
+writeFileSync(join(ROOT, 'dist', 'index.html'), html);
+console.log('\nBuilt dist/index.html (' + (html.length / 1024).toFixed(1) + ' KB — ' + ORDER.length + ' JS files + 2 vendored libs + CSS inlined)');
+console.log('Dev:  open index.html directly (file:// works)');
+console.log('Ship: dist/index.html is the self-contained artifact');
