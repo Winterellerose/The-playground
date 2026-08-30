@@ -4,10 +4,10 @@
    build.mjs — bundles the multi-file source into the single-file
    artifact. Zero dependencies: concatenating classic scripts in
    load order is exactly what the browser does with the <script src>
-   tags, so dist/index.html is behavior-identical to the dev build.
+   tags, so docs/index.html is behavior-identical to the dev build.
 
    Usage:  node build.mjs
-   Output: dist/index.html  (fully self-contained, file:// safe)
+   Output: docs/index.html  (fully self-contained, file:// safe)
    ════════════════════════════════════════════════════════════ */
 import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
@@ -54,8 +54,8 @@ swap(ORDER.map(f => '<script src="js/' + f + '.js"></script>').join('\n'),
 if (/<script\s+src=/i.test(html)) fail('a <script src> tag survived inlining');
 if (/<link(?![^>]+fonts\.googleapis)[^>]+stylesheet/i.test(html)) fail('the stylesheet <link> survived inlining');
 
-mkdirSync(join(ROOT, 'dist'), { recursive: true });
-writeFileSync(join(ROOT, 'dist', 'index.html'), html);
-console.log('\nBuilt dist/index.html (' + (html.length / 1024).toFixed(1) + ' KB — ' + ORDER.length + ' JS files + 2 vendored libs + CSS inlined)');
+mkdirSync(join(ROOT, 'docs'), { recursive: true });
+writeFileSync(join(ROOT, 'docs', 'index.html'), html);
+console.log('\nBuilt docs/index.html (' + (html.length / 1024).toFixed(1) + ' KB — ' + ORDER.length + ' JS files + 2 vendored libs + CSS inlined)');
 console.log('Dev:  open index.html directly (file:// works)');
-console.log('Ship: dist/index.html is the self-contained artifact');
+console.log('Ship: docs/index.html is the self-contained artifact');
