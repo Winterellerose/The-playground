@@ -3,8 +3,20 @@
 
 "use strict";
 /* ════════════════════════════════════════════════════════════
-   THE PLAYGROUND v2.9.3 — multi-provider AI studio (single file)
-   v2.9.3: accessibility — every icon-only control carries a real
+   THE PLAYGROUND v3.0.0 — multi-provider AI studio (single file)
+   v3.0.0: in-browser RAG — chat with multi-MB documents and codebases
+   without any API key or backend. A 📚 toggle in the input row switches
+   text/code attachments from inline-paste to INDEXED mode: files are
+   chunked (paragraph-first, 1200 chars, 150 overlap), tokenized and
+   ranked with pure-JS Okapi BM25 (rag.js), persisted as plain chunk
+   text in IndexedDB (ragstore.js — docs + parts stores), and the top-k
+   relevant excerpts across all in-scope docs are injected per message
+   into the system lane (same path as web-search context). Assistant
+   messages show a 📚 Docs source row with per-doc citations and hover
+   snippets. The 📚 button in the frame bar opens a document manager:
+   usage meter, delete, per-doc scope (this chat only / all chats).
+   Docs scoped to a chat are deleted with it. 8 MB/file, 12 docs,
+   24 MB index budget; session LRU keeps 2 doc indexes hot. v2.9.3: accessibility — every icon-only control carries a real
    accessible name (aria-label); the landing, model cards, sidebar rows,
    picker sections and thinking disclosures are keyboard focusable and
    Space/Enter activatable; the three overlays are semantic dialogs

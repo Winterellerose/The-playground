@@ -95,6 +95,29 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
       };
     }
   }
+  /* 📚 RAG retrieval — mirrors the web-search block above: fetch context
+     before the request so Stop works during it, check gen after every await,
+     cache nothing (doc indexes are already LRU-cached in ragui.js). */
+  if (ragModeOn() && lastUser) {
+    try {
+      const hits = await ragRetrieve(lastUser);
+      if (gen !== streamGen)
+        return { content: "", thinking: "", meta: null, aborted: true };
+      if (hits.length) {
+        cfg.ragContext = ragFormatContext(hits);
+        cfg.ragSources = hits.map((h) => ({
+          name: h.docName,
+          chunk: h.chunk.i + 1,
+          score: Math.round(h.score * 10) / 10,
+          snippet: ragSnippet(h.chunk.text, lastUser),
+        }));
+        const nDocs = new Set(hits.map((h) => h.docName)).size;
+        logRot(`📚 Retrieved ${hits.length} excerpt(s) from ${nDocs} doc(s)`, "ok");
+      }
+    } catch {
+      logRot("📚 Retrieval failed — sending without doc context", "warn");
+    }
+  }
   const { h, rb } = buildRequest(cfg, hist);
   const { pid, model: m } = cfg;
   let full = "",
@@ -327,6 +350,7 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
     thinking: think || undefined,
     meta: full || think ? meta : null,
     sources: cfg.webSources,
+    ragSources: cfg.ragSources,
   };
 }
 
@@ -378,6 +402,7 @@ async function runCompletion(c, regenIdx) {
           thinking: m.thinking,
           meta: m.meta,
           sources: m.sources,
+          ragSources: m.ragSources,
         },
       ];
       m.alts.push({
@@ -385,6 +410,7 @@ async function runCompletion(c, regenIdx) {
         thinking: result.thinking,
         meta: result.meta,
         sources: result.sources,
+        ragSources: result.ragSources,
       });
       m.activeAlt = m.alts.length - 1;
       m.content = result.content;
@@ -400,6 +426,7 @@ async function runCompletion(c, regenIdx) {
         thinking: result.thinking,
         meta: result.meta,
         sources: result.sources,
+        ragSources: result.ragSources,
         stopped: result.stopped || false,
       });
       asstIdx = c.messages.length - 1;

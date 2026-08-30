@@ -64,7 +64,7 @@ function addAssistantMsg(msg, idx) {
   const d = document.createElement("div");
   d.className = "msg assistant";
   d.dataset.idx = idx;
-  d.innerHTML = `<div class="msg-header"><span class="msg-role assistant">AI</span>${nav}${metaLine(alt.meta || msg.meta)}<div class="msg-actions"><span class="copied-toast">Copied</span><button data-act="copy-msg" title="Copy" aria-label="Copy message">${COPY_SVG}</button><button class="act-regen" data-act="regen" data-idx="${idx}" title="Regenerate" aria-label="Regenerate response">${REGEN_SVG}</button></div></div><div class="msg-body" data-raw="${esc(alt.content || "")}">${(alt.thinking ? thinkingHtml(alt.thinking) : "") + renderMd(alt.content || "")}</div>${sourcesHtml(alt.sources || msg.sources)}${followupsHtml(msg)}`;
+  d.innerHTML = `<div class="msg-header"><span class="msg-role assistant">AI</span>${nav}${metaLine(alt.meta || msg.meta)}<div class="msg-actions"><span class="copied-toast">Copied</span><button data-act="copy-msg" title="Copy" aria-label="Copy message">${COPY_SVG}</button><button class="act-regen" data-act="regen" data-idx="${idx}" title="Regenerate" aria-label="Regenerate response">${REGEN_SVG}</button></div></div><div class="msg-body" data-raw="${esc(alt.content || "")}">${(alt.thinking ? thinkingHtml(alt.thinking) : "") + renderMd(alt.content || "")}</div>${sourcesHtml(alt.sources || msg.sources)}${ragSourcesHtml(alt.ragSources || msg.ragSources)}${followupsHtml(msg)}`;
   chatWrap.appendChild(d);
   highlight(d);
 }
@@ -88,6 +88,7 @@ function switchAlt(idx, dir) {
   m.thinking = m.alts[ai].thinking;
   m.meta = m.alts[ai].meta;
   m.sources = m.alts[ai].sources;
+  m.ragSources = m.alts[ai].ragSources;
   saveChats();
   reloadUI();
 }

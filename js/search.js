@@ -209,6 +209,8 @@ function composeSys(cfg) {
         cfg.chatSys,
     );
   if (cfg && cfg.webContext) bits.push(cfg.webContext);
+  // Indexed-doc excerpts ride the same lane, after web context (both apply).
+  if (cfg && cfg.ragContext) bits.push(cfg.ragContext);
   return bits.join("\n\n");
 }
 function formatWebContext(srcs) {

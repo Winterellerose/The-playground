@@ -9,7 +9,8 @@ try {
 }
 let activeChatId = localStorage.getItem("active_chat_id") || null;
 let customModels = JSON.parse(localStorage.getItem("pg_custom_models") || "[]");
-let selectedModel = localStorage.getItem("selected_model");
+let selectedModel = localStorage.getItem("selectedModel");
+let savedPrompts = JSON.parse(localStorage.getItem("saved_prompts") || "[]");
 let isStreaming = false,
   abortCtrl = null,
   landingDismissed = false,

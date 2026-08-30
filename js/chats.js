@@ -116,6 +116,7 @@ function deleteChat(id) {
   stopStream();
   chats = chats.filter((c) => c.id !== id);
   saveChats();
+  ragDeleteChatDocs(id); // docs scoped to this chat are dead weight now
   if (activeChatId === id) newChat();
   else renderSidebar();
 }
