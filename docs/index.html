@@ -3148,153 +3148,6 @@ header {
 .file-chip button:hover {
   background: var(--danger);
 }
-/* ── 📚 RAG doc-indexing (v3.0) ── */
-.rag-btn {
-  background: transparent;
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-  width: 46px;
-  height: 46px;
-  border-radius: var(--radius);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.15s;
-  flex-shrink: 0;
-}
-.rag-btn:hover {
-  border-color: var(--text-dim);
-  color: var(--text);
-}
-.rag-btn.on {
-  border-color: rgba(126, 200, 180, 0.5);
-  background: rgba(126, 200, 180, 0.08);
-  color: var(--free);
-}
-.rag-chip .file-sub {
-  color: var(--free);
-}
-.rag-chip button {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(0, 0, 0, 0.75);
-  color: var(--text);
-  font-size: 0.62rem;
-  line-height: 1;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0;
-}
-.rag-chip button:hover {
-  background: var(--danger);
-}
-.msg-sources.rag {
-  border-top: 1px dashed rgba(126, 200, 200, 0.25);
-}
-.src-doc {
-  display: inline-flex;
-  align-items: center;
-  max-width: 260px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-  padding: 2px 7px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  color: var(--text-dim);
-  cursor: help;
-}
-.src-doc:hover {
-  color: var(--text);
-  border-color: var(--text-dim);
-}
-.rd-usage {
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-  margin-bottom: 12px;
-}
-.rd-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 4px;
-  border-bottom: 1px solid var(--border);
-}
-.rd-row.out {
-  opacity: 0.45;
-}
-.rd-main {
-  min-width: 0;
-  flex: 1;
-}
-.rd-name {
-  font-size: 0.8rem;
-  color: var(--text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.rd-meta {
-  font-family: var(--font-mono);
-  font-size: 0.58rem;
-  color: var(--text-faint);
-  letter-spacing: 0.04em;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-wrap: wrap;
-}
-.rd-scope {
-  background: none;
-  border: none;
-  color: var(--free);
-  font: inherit;
-  letter-spacing: inherit;
-  cursor: pointer;
-  padding: 0;
-  text-transform: inherit;
-}
-.rd-scope:hover {
-  text-decoration: underline;
-}
-.rd-out-tag {
-  color: var(--danger, #e06c75);
-  text-transform: uppercase;
-}
-.rd-del {
-  background: none;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.8rem;
-  padding: 4px 6px;
-  flex-shrink: 0;
-}
-.rd-del:hover {
-  border-color: var(--danger);
-}
-.rd-list {
-  display: block;
-}
-.rd-empty {
-  padding: 18px 4px;
-  color: var(--text-faint);
-  font-size: 0.78rem;
-  line-height: 1.6;
-}
 .msg-images {
   display: flex;
   gap: 8px;
@@ -3748,7 +3601,7 @@ header {
     <div class="landing-label">Initializing</div>
     <h1 class="landing-title">The <em>playground.</em></h1>
     <div class="landing-bar"><div class="landing-bar-fill"></div></div>
-    <div class="landing-meta"><span>Preparing studio</span><span>v3.0.0</span></div>
+    <div class="landing-meta"><span>Preparing studio</span><span>v2.9.3</span></div>
     <div class="landing-enter">Press to enter</div>
   </div>
 </div>
@@ -3810,13 +3663,6 @@ header {
       <div class="sb-sys">
         <div class="sb-sect-label">System Prompt</div>
         <textarea id="sysPrompt" placeholder="Optional system prompt…" spellcheck="false" aria-label="System prompt"></textarea>
-
-      <div class="sb-sect-label">Prompt Templates</div>
-      <div class="sb-actions" style="margin-top:10px">
-        <button class="btn-sm" data-act="prompt-add">Add Template</button>
-        <button class="btn-sm danger" data-act="prompt-clear">Clear All</button>
-      </div>
-      <div id="promptTemplates" style="margin-top:10px; max-height: 200px; overflow-y: auto;"></div>
       </div>
 
       <div>
@@ -3847,7 +3693,6 @@ header {
           <button class="btn-sm" data-act="import-chats">Import chats</button>
           <input type="file" id="importFile" accept=".json" style="display:none">
           <button class="btn-sm danger" data-act="clear-chat">Clear chat</button>
-          <button class="btn-sm" data-act="export-markdown">Export Markdown</button>
         </div>
       </div>
     </div>
@@ -3872,14 +3717,6 @@ header {
   </div>
 </div>
 
-<!-- Indexed-document manager (v3.0): per-chat/global scope, delete, add -->
-<div class="st-overlay" id="rdOverlay" data-act="close-rag-manager">
-  <div class="st-modal" role="dialog" aria-modal="true" aria-labelledby="rdTitle" tabindex="-1">
-    <div class="st-head"><h3 id="rdTitle">Indexed documents</h3><button class="st-close" data-act="close-rag-manager" aria-label="Close document manager"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
-    <div class="st-body" id="rdBody"></div>
-  </div>
-</div>
-
 <main class="main">
 <header>
   <button class="hamburger" data-act="toggle-sidebar" aria-label="Toggle sidebar" aria-expanded="false"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button>
@@ -3900,7 +3737,6 @@ header {
         <span class="frame-title">THE PLAYGROUND</span>
         <span class="frame-meta" id="frameMeta">—</span>
         <button class="frame-prompt" id="chatPromptBtn" data-act="open-chat-prompt" title="System prompt for THIS conversation only — layers on top of the global one from Settings"><span aria-hidden="true">📝</span><span id="chatPromptState">Prompt</span></button>
-        <button class="frame-prompt" id="ragDocsBtn" data-act="open-rag-manager" title="Indexed documents — manage scope and delete"><span aria-hidden="true">📚</span><span id="ragDocsState">Docs</span></button>
       </div>
       <div class="chat-wrap" id="chatWrap">
         <div class="welcome" id="welcome">
@@ -3922,7 +3758,6 @@ header {
 <div class="input-area">
   <div class="preview-strip" id="previewStrip"></div>
   <div class="input-row">
-    <button class="rag-btn" id="ragToggle" data-act="toggle-rag" title="Doc indexing is OFF — click to index large docs/codebases and chat with them" aria-pressed="false" aria-label="Toggle document indexing"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z"/></svg></button>
     <button class="attach-btn" id="attachBtn" data-act="attach" title="Attach files or images" aria-label="Attach files or images"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg></button>
     <textarea id="userInput" placeholder="Send a message…" rows="1" aria-label="Message"></textarea>
     <button class="send-btn" id="sendBtn">Send <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg></button>
@@ -3930,12 +3765,11 @@ header {
   <div class="input-hint" style="display:none">Enter to send · Shift+Enter newline · Tab indents · Free keys rotate automatically · Drop / paste files · images on VISION models</div>
 </div>
 <input type="file" id="imgFile" accept="image/*,.txt,.md,.markdown,.json,.csv,.js,.mjs,.cjs,.ts,.tsx,.jsx,.py,.rb,.go,.rs,.java,.c,.h,.hpp,.hh,.cpp,.cc,.cxx,.cs,.html,.htm,.css,.xml,.yml,.yaml,.sql,.sh,.bash,.zsh,.ksh" multiple style="display:none">
-<input type="file" id="ragFile" accept=".txt,.md,.markdown,.json,.csv,.js,.mjs,.cjs,.ts,.tsx,.jsx,.py,.rb,.go,.rs,.java,.c,.h,.hpp,.hh,.cpp,.cc,.cxx,.cs,.html,.htm,.css,.xml,.yml,.yaml,.sql,.sh,.bash,.zsh,.ksh,.log" multiple style="display:none">
 <div class="drop-overlay" id="dropOverlay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg><span>Drop files or images to attach</span></div>
 </main>
 </div>
 
-<!-- built from 21 files — edit the sources, not this file -->
+<!-- built from 18 files — edit the sources, not this file -->
 <script>
 /* ═══ js/config.js ═══ */
 "use strict";
@@ -3943,20 +3777,8 @@ header {
 
 "use strict";
 /* ════════════════════════════════════════════════════════════
-   THE PLAYGROUND v3.0.0 — multi-provider AI studio (single file)
-   v3.0.0: in-browser RAG — chat with multi-MB documents and codebases
-   without any API key or backend. A 📚 toggle in the input row switches
-   text/code attachments from inline-paste to INDEXED mode: files are
-   chunked (paragraph-first, 1200 chars, 150 overlap), tokenized and
-   ranked with pure-JS Okapi BM25 (rag.js), persisted as plain chunk
-   text in IndexedDB (ragstore.js — docs + parts stores), and the top-k
-   relevant excerpts across all in-scope docs are injected per message
-   into the system lane (same path as web-search context). Assistant
-   messages show a 📚 Docs source row with per-doc citations and hover
-   snippets. The 📚 button in the frame bar opens a document manager:
-   usage meter, delete, per-doc scope (this chat only / all chats).
-   Docs scoped to a chat are deleted with it. 8 MB/file, 12 docs,
-   24 MB index budget; session LRU keeps 2 doc indexes hot. v2.9.3: accessibility — every icon-only control carries a real
+   THE PLAYGROUND v2.9.3 — multi-provider AI studio (single file)
+   v2.9.3: accessibility — every icon-only control carries a real
    accessible name (aria-label); the landing, model cards, sidebar rows,
    picker sections and thinking disclosures are keyboard focusable and
    Space/Enter activatable; the three overlays are semantic dialogs
@@ -4764,8 +4586,7 @@ try {
 }
 let activeChatId = localStorage.getItem("active_chat_id") || null;
 let customModels = JSON.parse(localStorage.getItem("pg_custom_models") || "[]");
-let selectedModel = localStorage.getItem("selectedModel");
-let savedPrompts = JSON.parse(localStorage.getItem("saved_prompts") || "[]");
+let selectedModel = localStorage.getItem("selected_model");
 let isStreaming = false,
   abortCtrl = null,
   landingDismissed = false,
@@ -6130,7 +5951,7 @@ function renderModelPicker() {
 function selectModel(id, close) {
   if (!MODELS[id]) return;
   selectedModel = id;
-  localStorage.setItem("selectedModel", id);
+  localStorage.setItem("selected_model", id);
   const m = MODELS[id];
   $("heroModel").textContent = m.badge.toUpperCase();
   $("heroCtx").textContent = m.ctx || "—";
@@ -6293,20 +6114,6 @@ async function addImageFiles(files) {
 }
 async function addTextFiles(files) {
   const list = [...(files || [])].filter(Boolean);
-  // 📚 Doc-indexing mode: oversized text files become searchable documents
-  // instead of failing the size check — BM25 retrieval substitutes for
-  // inlining. Small files still ride inline below.
-  if (ragModeOn()) {
-    const big = list.filter((f) => f && f.size > FILE_MAX_BYTES && isSupportedTextFile(f));
-    const small = list.filter((f) => !(f && f.size > FILE_MAX_BYTES && isSupportedTextFile(f)));
-    if (big.length) await ragIndexFiles(big);
-    await addInlineTextFiles(small);
-    return;
-  }
-  await addInlineTextFiles(list);
-}
-async function addInlineTextFiles(files) {
-  const list = [...(files || [])].filter(Boolean);
   for (const f of list) {
     if (pendingFiles.length >= MAX_FILES) {
       logRot(`Max ${MAX_FILES} files per message`, "warn");
@@ -6361,10 +6168,9 @@ function renderPreviews() {
     )
     .join("");
   const files = pendingFiles.map((f, i) => fileChipHtml(f, i)).join("");
-  const rag = ragChipsHtml();
-  s.innerHTML = imgs + files + rag;
+  s.innerHTML = imgs + files;
   userInput.placeholder =
-    pendingImages.length || pendingFiles.length || ragRecent.length
+    pendingImages.length || pendingFiles.length
       ? "Add a message (optional)…"
       : "Send a message…";
 }
@@ -6620,8 +6426,6 @@ function composeSys(cfg) {
         cfg.chatSys,
     );
   if (cfg && cfg.webContext) bits.push(cfg.webContext);
-  // Indexed-doc excerpts ride the same lane, after web context (both apply).
-  if (cfg && cfg.ragContext) bits.push(cfg.ragContext);
   return bits.join("\n\n");
 }
 function formatWebContext(srcs) {
@@ -6763,7 +6567,6 @@ function deleteChat(id) {
   stopStream();
   chats = chats.filter((c) => c.id !== id);
   saveChats();
-  ragDeleteChatDocs(id); // docs scoped to this chat are dead weight now
   if (activeChatId === id) newChat();
   else renderSidebar();
 }
@@ -7082,7 +6885,7 @@ function addAssistantMsg(msg, idx) {
   const d = document.createElement("div");
   d.className = "msg assistant";
   d.dataset.idx = idx;
-  d.innerHTML = `<div class="msg-header"><span class="msg-role assistant">AI</span>${nav}${metaLine(alt.meta || msg.meta)}<div class="msg-actions"><span class="copied-toast">Copied</span><button data-act="copy-msg" title="Copy" aria-label="Copy message">${COPY_SVG}</button><button class="act-regen" data-act="regen" data-idx="${idx}" title="Regenerate" aria-label="Regenerate response">${REGEN_SVG}</button></div></div><div class="msg-body" data-raw="${esc(alt.content || "")}">${(alt.thinking ? thinkingHtml(alt.thinking) : "") + renderMd(alt.content || "")}</div>${sourcesHtml(alt.sources || msg.sources)}${ragSourcesHtml(alt.ragSources || msg.ragSources)}${followupsHtml(msg)}`;
+  d.innerHTML = `<div class="msg-header"><span class="msg-role assistant">AI</span>${nav}${metaLine(alt.meta || msg.meta)}<div class="msg-actions"><span class="copied-toast">Copied</span><button data-act="copy-msg" title="Copy" aria-label="Copy message">${COPY_SVG}</button><button class="act-regen" data-act="regen" data-idx="${idx}" title="Regenerate" aria-label="Regenerate response">${REGEN_SVG}</button></div></div><div class="msg-body" data-raw="${esc(alt.content || "")}">${(alt.thinking ? thinkingHtml(alt.thinking) : "") + renderMd(alt.content || "")}</div>${sourcesHtml(alt.sources || msg.sources)}${followupsHtml(msg)}`;
   chatWrap.appendChild(d);
   highlight(d);
 }
@@ -7106,7 +6909,6 @@ function switchAlt(idx, dir) {
   m.thinking = m.alts[ai].thinking;
   m.meta = m.alts[ai].meta;
   m.sources = m.alts[ai].sources;
-  m.ragSources = m.alts[ai].ragSources;
   saveChats();
   reloadUI();
 }
@@ -7423,29 +7225,6 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
       };
     }
   }
-  /* 📚 RAG retrieval — mirrors the web-search block above: fetch context
-     before the request so Stop works during it, check gen after every await,
-     cache nothing (doc indexes are already LRU-cached in ragui.js). */
-  if (ragModeOn() && lastUser) {
-    try {
-      const hits = await ragRetrieve(lastUser);
-      if (gen !== streamGen)
-        return { content: "", thinking: "", meta: null, aborted: true };
-      if (hits.length) {
-        cfg.ragContext = ragFormatContext(hits);
-        cfg.ragSources = hits.map((h) => ({
-          name: h.docName,
-          chunk: h.chunk.i + 1,
-          score: Math.round(h.score * 10) / 10,
-          snippet: ragSnippet(h.chunk.text, lastUser),
-        }));
-        const nDocs = new Set(hits.map((h) => h.docName)).size;
-        logRot(`📚 Retrieved ${hits.length} excerpt(s) from ${nDocs} doc(s)`, "ok");
-      }
-    } catch {
-      logRot("📚 Retrieval failed — sending without doc context", "warn");
-    }
-  }
   const { h, rb } = buildRequest(cfg, hist);
   const { pid, model: m } = cfg;
   let full = "",
@@ -7678,7 +7457,6 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
     thinking: think || undefined,
     meta: full || think ? meta : null,
     sources: cfg.webSources,
-    ragSources: cfg.ragSources,
   };
 }
 
@@ -7730,7 +7508,6 @@ async function runCompletion(c, regenIdx) {
           thinking: m.thinking,
           meta: m.meta,
           sources: m.sources,
-          ragSources: m.ragSources,
         },
       ];
       m.alts.push({
@@ -7738,7 +7515,6 @@ async function runCompletion(c, regenIdx) {
         thinking: result.thinking,
         meta: result.meta,
         sources: result.sources,
-        ragSources: result.ragSources,
       });
       m.activeAlt = m.alts.length - 1;
       m.content = result.content;
@@ -7754,7 +7530,6 @@ async function runCompletion(c, regenIdx) {
         thinking: result.thinking,
         meta: result.meta,
         sources: result.sources,
-        ragSources: result.ragSources,
         stopped: result.stopped || false,
       });
       asstIdx = c.messages.length - 1;
@@ -7836,699 +7611,6 @@ async function sendMessage() {
   pendingFiles = [];
   renderPreviews();
   await runCompletion(c);
-}
-
-/* ═══ js/ragstore.js ═══ */
-"use strict";
-/* ═══ ragstore.js — IndexedDB persistence for indexed documents ═══
-   Two object stores:
-     docs  — metadata records {id, name, size, chunks, addedAt, chatId}
-     parts — one record per chunk {id: `${docId}:${n}`, docId, n, text}
-   Chunk text lives here, never in localStorage (which is capped and already
-   carries chat history). Everything degrades gracefully: if IndexedDB is
-   unavailable (private mode, disabled storage) RAG simply reports
-   unavailable and the rest of the app is untouched. */
-
-const RAG_DB_NAME = "playground-rag";
-const RAG_DB_VERSION = 1;
-const RAG_MAX_DOCS = 12;
-const RAG_MAX_TOTAL_BYTES = 24 * 1024 * 1024; // 24 MB of raw text across docs
-
-let ragDbPromise = null;
-
-function ragAvailable() {
-  try {
-    return typeof indexedDB !== "undefined" && !!indexedDB;
-  } catch {
-    return false;
-  }
-}
-
-function ragOpenDb() {
-  if (!ragAvailable()) return Promise.reject(new Error("IndexedDB unavailable"));
-  if (ragDbPromise) return ragDbPromise;
-  ragDbPromise = new Promise((resolve, reject) => {
-    const req = indexedDB.open(RAG_DB_NAME, RAG_DB_VERSION);
-    req.onupgradeneeded = () => {
-      const db = req.result;
-      if (!db.objectStoreNames.contains("docs")) {
-        const s = db.createObjectStore("docs", { keyPath: "id" });
-        s.createIndex("chatId", "chatId", { unique: false });
-      }
-      if (!db.objectStoreNames.contains("parts")) {
-        const s = db.createObjectStore("parts", { keyPath: "id" });
-        s.createIndex("docId", "docId", { unique: false });
-      }
-    };
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error || new Error("IndexedDB open failed"));
-  }).catch((e) => {
-    ragDbPromise = null; // allow retry on a later call
-    throw e;
-  });
-  return ragDbPromise;
-}
-
-/* Small promisified helpers. */
-function ragReq(store, mode, fn) {
-  return ragOpenDb().then(
-    (db) =>
-      new Promise((resolve, reject) => {
-        const tx = db.transaction(store, mode);
-        const out = fn(tx.objectStore(store));
-        tx.oncomplete = () => resolve(out && out.result !== undefined ? out.result : out);
-        tx.onerror = () => reject(tx.error || new Error("IndexedDB error"));
-        tx.onabort = () => reject(tx.error || new Error("IndexedDB aborted"));
-      })
-  );
-}
-const ragGetAll = (store) => ragReq(store, "readonly", (s) => s.getAll());
-const ragPut = (store, val) => ragReq(store, "readwrite", (s) => s.put(val));
-
-/* Persist doc metadata + all chunk texts in one transaction. */
-async function ragSaveDoc(doc, chunks) {
-  const db = await ragOpenDb();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(["docs", "parts"], "readwrite");
-    tx.objectStore("docs").put(doc);
-    const parts = tx.objectStore("parts");
-    chunks.forEach((c) => parts.put({ id: doc.id + ":" + c.i, docId: doc.id, n: c.i, text: c.text }));
-    tx.oncomplete = () => resolve(true);
-    tx.onerror = () => reject(tx.error || new Error("IndexedDB write failed"));
-    tx.onabort = () => reject(tx.error || new Error("IndexedDB write aborted"));
-  });
-}
-
-/* Load metadata list, newest first. */
-async function ragListDocs() {
-  try {
-    const docs = await ragGetAll("docs");
-    return (docs || []).sort((a, b) => (b.addedAt || 0) - (a.addedAt || 0));
-  } catch {
-    return [];
-  }
-}
-
-/* Full doc → {doc, chunks:[{i,text}]}. */
-async function ragLoadDoc(id) {
-  const db = await ragOpenDb();
-  const doc = await new Promise((resolve, reject) => {
-    const tx = db.transaction(["docs", "parts"], "readonly");
-    const d = tx.objectStore("docs").get(id);
-    const all = [];
-    const idx = tx.objectStore("parts").index("docId");
-    idx.openCursor(IDBKeyRange.only(id)).onsuccess = (e) => {
-      const cur = e.target.result;
-      if (cur) {
-        all.push({ i: cur.value.n, text: cur.value.text });
-        cur.continue();
-      }
-    };
-    tx.oncomplete = () => resolve({ doc: d.result, chunks: all });
-    tx.onerror = () => reject(tx.error || new Error("IndexedDB read failed"));
-  });
-  if (!doc.doc) return null;
-  doc.chunks.sort((a, b) => a.i - b.i);
-  return doc;
-}
-
-/* Delete one doc and its parts. */
-async function ragDeleteDoc(id) {
-  const db = await ragOpenDb();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(["docs", "parts"], "readwrite");
-    tx.objectStore("docs").delete(id);
-    const idx = tx.objectStore("parts").index("docId");
-    idx.openCursor(IDBKeyRange.only(id)).onsuccess = (e) => {
-      const cur = e.target.result;
-      if (cur) {
-        cur.delete();
-        cur.continue();
-      }
-    };
-    tx.oncomplete = () => resolve(true);
-    tx.onerror = () => reject(tx.error || new Error("IndexedDB delete failed"));
-  });
-}
-
-/* Usage summary for the manager UI. */
-async function ragUsage() {
-  const docs = await ragListDocs();
-  const bytes = docs.reduce((n, d) => n + (Number(d.size) || 0), 0);
-  const chunks = docs.reduce((n, d) => n + (Number(d.chunks) || 0), 0);
-  return { docs, bytes, chunks, maxDocs: RAG_MAX_DOCS, maxBytes: RAG_MAX_TOTAL_BYTES };
-}
-
-/* ═══ js/rag.js ═══ */
-"use strict";
-/* ═══ rag.js — pure-JS BM25 retrieval engine (chunk → index → search) ═══
-   No dependencies, no DOM, no network. A document is split into overlapping
-   chunks; each chunk is tokenized into a term-frequency map; BM25 ranks
-   chunks against the user's query. The index is rebuilt from stored chunk
-   text on first use per session, so IndexedDB only ever persists plain text.
-
-   Chunking is paragraph-first: paragraphs accumulate up to RAG_CHUNK_SIZE,
-   oversized paragraphs are split at whitespace with overlap so no sentence
-   gets butchered at an arbitrary byte boundary. */
-
-const RAG_CHUNK_SIZE = 1200; // target chunk length in characters
-const RAG_CHUNK_OVERLAP = 150; // character overlap between consecutive chunks
-const RAG_MAX_CHUNKS = 6000; // hard cap per document (~7 MB of text)
-const RAG_K1 = 1.5; // BM25 term-frequency saturation
-const RAG_B = 0.75; // BM25 length normalization
-const RAG_MIN_SCORE = 1.2; // below this a chunk is treated as a non-match
-const RAG_DEFAULT_TOPK = 6; // max excerpts injected per message (all docs)
-
-/* Small English stopword set. Identifiers, versions and numbers survive on
-   purpose — they carry most of the signal in code and docs. */
-const RAG_STOP = new Set(
-  (
-    "a an and are as at be been being but by for from has have he her hers him his " +
-    "i if in into is it its of on or she that the their them then there these they " +
-    "this those to was were will with you your ours not no nor so too very can just " +
-    "should now do does did doing done had having about over under again further " +
-    "once all any both each few more most other some such only own same than when " +
-    "where which while who whom why how what"
-  ).split(" ")
-);
-
-/* Lowercase, strip accents, keep letters/numbers/underscore, drop 1-char noise. */
-function ragTokenize(s) {
-  return String(s || "")
-    .toLowerCase()
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^\p{L}\p{N}_]+/gu, " ")
-    .trim()
-    .split(/\s+/)
-    .filter((t) => t.length >= 2);
-}
-
-/* Split one oversized paragraph at whitespace near `size`, with overlap. */
-function ragSplitLong(p, size, overlap) {
-  const out = [];
-  let i = 0;
-  while (i < p.length) {
-    let end = Math.min(p.length, i + size);
-    if (end < p.length) {
-      const brk = Math.max(p.lastIndexOf(" ", end), p.lastIndexOf("\n", end));
-      if (brk > i + Math.floor(size * 0.5)) end = brk;
-    }
-    out.push(p.slice(i, end));
-    if (end >= p.length) break;
-    i = Math.max(end - overlap, i + 1);
-  }
-  return out;
-}
-
-/* → [{i, text}] in document order. */
-function ragChunkText(text, opts) {
-  const size = (opts && opts.size) || RAG_CHUNK_SIZE;
-  const overlap = Math.min(
-    opts && opts.overlap != null ? opts.overlap : RAG_CHUNK_OVERLAP,
-    Math.floor(size / 3)
-  );
-  const src = String(text || "");
-  if (!src.trim()) return [];
-  const paras = src.split(/\n{2,}/);
-  const chunks = [];
-  let cur = "";
-  const flush = () => {
-    const t = cur.trim();
-    if (t) chunks.push(t);
-    cur = "";
-  };
-  for (const para of paras) {
-    const p = para.trim();
-    if (!p) continue;
-    if (p.length > size) {
-      flush();
-      for (const piece of ragSplitLong(p, size, overlap)) chunks.push(piece);
-      continue;
-    }
-    if (cur && cur.length + p.length + 2 > size) flush();
-    cur = cur ? cur + "\n\n" + p : p;
-  }
-  flush();
-  return chunks
-    .slice(0, RAG_MAX_CHUNKS)
-    .map((text, i) => ({ i, text }));
-}
-
-/* Build a BM25 index from chunks. Async only to yield to the UI on large
-   documents (progress callback gets 0–100). Returns
-   {N, df:Map, tfs:Map[], lens:number[], avgLen}. */
-async function ragBuildIndex(chunks, onProgress) {
-  const N = chunks.length;
-  const df = new Map();
-  const tfs = new Array(N);
-  const lens = new Array(N);
-  let totalLen = 0;
-  for (let d = 0; d < N; d++) {
-    const toks = ragTokenize(chunks[d].text).filter((t) => !RAG_STOP.has(t));
-    const tf = new Map();
-    for (const t of toks) tf.set(t, (tf.get(t) || 0) + 1);
-    tfs[d] = tf;
-    lens[d] = toks.length;
-    totalLen += toks.length;
-    for (const t of tf.keys()) df.set(t, (df.get(t) || 0) + 1);
-    if (onProgress && d % 250 === 0 && d > 0) {
-      onProgress(Math.round((d / N) * 100));
-      await new Promise((r) => setTimeout(r, 0));
-    }
-  }
-  return { N, df, tfs, lens, avgLen: N ? totalLen / N : 0 };
-}
-
-/* BM25 (Okapi). Returns [{chunk, score}] sorted best-first. */
-function ragSearchIndex(index, chunks, query, opts) {
-  if (!index || !index.N) return [];
-  const topK = (opts && opts.topK) || 10;
-  const minScore = opts && opts.minScore != null ? opts.minScore : RAG_MIN_SCORE;
-  const qTokens = [...new Set(ragTokenize(query).filter((t) => !RAG_STOP.has(t)))];
-  if (!qTokens.length) return [];
-  const avg = index.avgLen || 1;
-  const scores = new Array(index.N).fill(0);
-  for (const t of qTokens) {
-    const n = index.df.get(t);
-    if (!n) continue;
-    const idf = Math.log(1 + (index.N - n + 0.5) / (n + 0.5));
-    for (let d = 0; d < index.N; d++) {
-      const f = index.tfs[d].get(t);
-      if (!f) continue;
-      scores[d] +=
-        (idf * (f * (RAG_K1 + 1))) /
-        (f + RAG_K1 * (1 - RAG_B + RAG_B * (index.lens[d] / avg)));
-    }
-  }
-  const hits = [];
-  for (let d = 0; d < index.N; d++)
-    if (scores[d] >= minScore) hits.push({ chunk: chunks[d], score: scores[d] });
-  hits.sort((a, b) => b.score - a.score);
-  return hits.slice(0, topK);
-}
-
-/* A short window around the first query-term hit — used for source tooltips. */
-function ragSnippet(text, query, len) {
-  const L = len || 160;
-  const src = String(text || "").replace(/\s+/g, " ").trim();
-  if (src.length <= L) return src;
-  const hay = src.toLowerCase();
-  let at = -1;
-  for (const t of ragTokenize(query).filter((t) => !RAG_STOP.has(t))) {
-    const i = hay.indexOf(t);
-    if (i >= 0 && (at < 0 || i < at)) at = i;
-  }
-  if (at < 0) at = 0;
-  const start = Math.max(0, at - Math.floor(L / 3));
-  return (
-    (start > 0 ? "…" : "") +
-    src.slice(start, start + L) +
-    (start + L < src.length ? "…" : "")
-  );
-}
-
-/* ═══ js/ragui.js ═══ */
-"use strict";
-/* ═══ ragui.js — document indexing UI, retrieval pipeline, doc manager ═══
-   Flow: toggle 📚 in the input row → dropped/pasted/attached text files are
-   chunked + BM25-indexed (progress on chips) and stored in IndexedDB. Every
-   message while the toggle is ON retrieves the top-k relevant chunks across
-   all in-scope docs and injects them into the system lane; the assistant
-   message gets a 📚 Docs source row. The frame-bar 📚 button opens the doc
-   manager (delete, per-doc scope: this chat / all chats). */
-
-const RAG_MAX_FILE_BYTES = 8 * 1024 * 1024; // 8 MB per file
-const RAG_RETRIEVE_MAX_PER_DOC = 4; // cap per doc so one doc can't crowd out others
-const RAG_CACHE_DOCS = 2; // in-memory LRU docs (chunk text + index)
-
-/* Session-only: chips for docs being indexed / just indexed. Persisted docs
-   live in IndexedDB via ragstore.js. Shape: {id, name, chunks, bytes, state, progress} */
-var ragRecent = [];
-var ragCache = new Map(); // docId → {chunks, index, usedAt}
-let ragIndexingCount = 0;
-
-/* ── Mode toggle ── */
-function ragModeOn() {
-  try {
-    return localStorage.getItem("pg_rag_mode") === "on";
-  } catch {
-    return false;
-  }
-}
-function ragToggleMode() {
-  const on = !ragModeOn();
-  try {
-    localStorage.setItem("pg_rag_mode", on ? "on" : "off");
-  } catch {}
-  logRot(
-    on
-      ? "📚 Doc indexing ON — attach large files to index them; every message retrieves relevant excerpts"
-      : "📚 Doc indexing OFF",
-    on ? "ok" : "evt"
-  );
-  syncRagUI();
-}
-function syncRagUI() {
-  const b = $("ragToggle");
-  if (b) {
-    const on = ragModeOn();
-    b.classList.toggle("on", on);
-    b.setAttribute("aria-pressed", on ? "true" : "false");
-    b.title = on
-      ? "Doc indexing is ON — text/code attachments are indexed (BM25) instead of pasted; click to turn off"
-      : "Doc indexing is OFF — click to index large docs/codebases and chat with them (no size cap of the 512 KB inline limit)";
-  }
-  ragSyncFrame();
-}
-function ragSyncFrame() {
-  const btn = $("ragDocsBtn"),
-    lbl = $("ragDocsState");
-  if (!btn || !lbl) return;
-  ragUsage().then((u) => {
-    const n = u.docs.length;
-    lbl.textContent = n ? "Docs (" + n + ")" : "Docs";
-    btn.classList.toggle("on", n > 0);
-  });
-}
-
-/* ── Chip strip (shares #previewStrip with attachments) ── */
-function ragChipsHtml() {
-  return ragRecent
-    .map((d, i) => {
-      const sub =
-        d.state === "indexing"
-          ? "INDEXING " + (d.progress || 0) + "%"
-          : esc(fmtFileSize(d.bytes)) + " · " + d.chunks + " CHUNKS";
-      return (
-        '<div class="file-chip rag-chip"><span class="file-ico">📚</span><div class="file-meta"><div class="file-name" title="' +
-        esc(d.name) +
-        '">' +
-        esc(d.name) +
-        '</div><div class="file-sub">' +
-        sub +
-        "</div></div>" +
-        '<button type="button" data-act="remove-rag" data-i="' +
-        i +
-        '" title="Delete indexed document" aria-label="Delete indexed document ' +
-        esc(d.name) +
-        '">×</button></div>'
-      );
-    })
-    .join("");
-}
-function ragDeleteChip(i) {
-  const d = ragRecent[i];
-  if (!d) return;
-  ragRecent.splice(i, 1);
-  ragCache.delete(d.id);
-  ragRemoveDoc(d.id);
-  renderPreviews();
-}
-
-/* ── Indexing pipeline ── */
-function ragIndexing() {
-  return ragIndexingCount > 0;
-}
-async function ragIndexFiles(files) {
-  const list = [...(files || [])].filter(Boolean);
-  if (!list.length) return;
-  if (!ragAvailable()) {
-    logRot("📚 IndexedDB is unavailable — doc indexing disabled (private mode?)", "err");
-    return;
-  }
-  const usage = await ragUsage();
-  let bytes = usage.bytes,
-    docs = usage.docs.length;
-  for (const f of list) {
-    if (!isSupportedTextFile(f)) {
-      logRot((f.name || "file") + ": unsupported file type for indexing", "warn");
-      continue;
-    }
-    if (f.size > RAG_MAX_FILE_BYTES) {
-      logRot((f.name || "file") + ": over the 8 MB per-file indexing limit", "warn");
-      continue;
-    }
-    if (docs >= usage.maxDocs) {
-      logRot("📚 Doc limit reached (" + usage.maxDocs + ") — remove one in the 📚 manager", "warn");
-      break;
-    }
-    if (bytes + f.size > usage.maxBytes) {
-      logRot((f.name || "file") + ": would exceed the 24 MB index budget — remove a doc first", "warn");
-      break;
-    }
-    try {
-      const text = await readFileText(f);
-      if (looksBinary(text)) {
-        logRot((f.name || "file") + ": binary files aren't supported", "warn");
-        continue;
-      }
-      const chunks = ragChunkText(text);
-      if (!chunks.length) {
-        logRot((f.name || "file") + ": no text content found", "warn");
-        continue;
-      }
-      const id = crypto.randomUUID();
-      const chip = {
-        id,
-        name: f.name || "document",
-        chunks: chunks.length,
-        bytes: f.size,
-        state: "indexing",
-        progress: 0,
-      };
-      ragRecent.push(chip);
-      renderPreviews();
-      ragIndexingCount++;
-      try {
-        const index = await ragBuildIndex(chunks, (p) => {
-          chip.progress = p;
-          renderPreviews();
-        });
-        const doc = {
-          id,
-          name: chip.name,
-          size: f.size,
-          chunks: chunks.length,
-          addedAt: Date.now(),
-          chatId: activeChatId || null, // indexed inside a chat → scoped to it
-        };
-        await ragSaveDoc(doc, chunks);
-        ragCache.set(id, { chunks, index, usedAt: Date.now() });
-        ragEvictCache();
-        chip.state = "ready";
-        renderPreviews();
-        ragSyncFrame();
-        logRot(
-          "📚 Indexed " + chip.name + " — " + chunks.length + " chunks, " + fmtFileSize(f.size),
-          "ok"
-        );
-        docs++;
-        bytes += f.size;
-      } finally {
-        ragIndexingCount--;
-      }
-    } catch (e) {
-      logRot("📚 Could not index " + (f.name || "file") + ": " + (e.message || "read error"), "err");
-    }
-  }
-  renderPreviews();
-}
-function ragEvictCache() {
-  while (ragCache.size > RAG_CACHE_DOCS) {
-    let oldest = null;
-    for (const [id, v] of ragCache)
-      if (!oldest || v.usedAt < ragCache.get(oldest).usedAt) oldest = id;
-    if (oldest) ragCache.delete(oldest);
-    else break;
-  }
-}
-
-/* ── Retrieval ── */
-async function ragEnsureDoc(id) {
-  let e = ragCache.get(id);
-  if (e) {
-    e.usedAt = Date.now();
-    return e;
-  }
-  const doc = await ragLoadDoc(id);
-  if (!doc) return null;
-  const index = await ragBuildIndex(doc.chunks);
-  e = { chunks: doc.chunks, index, usedAt: Date.now() };
-  ragCache.set(id, e);
-  ragEvictCache();
-  return e;
-}
-/* In-scope docs = global docs + docs scoped to the active chat. */
-async function ragInScopeDocs() {
-  const c = getActiveChat();
-  const docs = await ragListDocs();
-  return docs.filter((d) => !d.chatId || (c && d.chatId === c.id));
-}
-/* Top-k across all in-scope docs, capped per doc. → [{docName, chunk, score}] */
-async function ragRetrieve(query, opts) {
-  const docs = await ragInScopeDocs();
-  if (!docs.length) return [];
-  const topK = (opts && opts.topK) || RAG_DEFAULT_TOPK;
-  const perDoc = Math.max(1, Math.min(RAG_RETRIEVE_MAX_PER_DOC, topK));
-  const perDocHits = [];
-  for (const d of docs) {
-    const e = await ragEnsureDoc(d.id);
-    if (!e) continue;
-    const hits = ragSearchIndex(e.index, e.chunks, query, { topK: perDoc });
-    for (const h of hits) perDocHits.push({ docName: d.name, docId: d.id, chunk: h.chunk, score: h.score });
-  }
-  perDocHits.sort((a, b) => b.score - a.score);
-  return perDocHits.slice(0, topK);
-}
-function ragFormatContext(hits) {
-  if (!hits || !hits.length) return "";
-  const seen = new Map(); // docName → running citation number
-  const blocks = hits.map((h) => {
-    if (!seen.has(h.docName)) seen.set(h.docName, seen.size + 1);
-    const n = seen.get(h.docName);
-    return (
-      "[Doc " + n + " · " + h.docName + " · excerpt " + (h.chunk.i + 1) + "]\n" +
-      h.chunk.text
-    );
-  });
-  return (
-    "DOCUMENT CONTEXT (retrieved excerpts from the user's indexed documents — the most relevant passages for the question. Cite them as [Doc N] where used; they are partial excerpts, not the full documents. If the excerpts don't contain the answer, say so):\n\n" +
-    blocks.join("\n\n")
-  );
-}
-function ragSourcesHtml(srcs) {
-  if (!srcs || !srcs.length) return "";
-  const names = new Map();
-  srcs.forEach((s) => {
-    if (!names.has(s.name)) names.set(s.name, names.size + 1);
-  });
-  const items = srcs
-    .map(
-      (s) =>
-        '<span class="src-doc" title="' +
-        esc(s.snippet || "") +
-        '">Doc ' +
-        (names.get(s.name) || 1) +
-        " · " +
-        esc(s.name) +
-        " · ch." +
-        esc(String(s.chunk)) +
-        "</span>"
-    )
-    .join("");
-  return '<div class="msg-sources rag"><span class="src-label">📚 Docs</span>' + items + "</div>";
-}
-
-/* ── Doc manager overlay ── */
-function renderRagManager() {
-  const body = $("rdBody");
-  if (!body) return;
-  ragUsage().then((u) => {
-    if (!body.isConnected) return;
-    const c = getActiveChat();
-    const rows = u.docs
-      .map((d) => {
-        const scoped = !!d.chatId;
-        const inScope = !scoped || (c && d.chatId === c.id);
-        return (
-          '<div class="rd-row' + (inScope ? "" : " out") + '">' +
-          '<div class="rd-main"><div class="rd-name" title="' + esc(d.name) + '">' + esc(d.name) + "</div>" +
-          '<div class="rd-meta">' + esc(fmtFileSize(d.size)) + " · " + esc(String(d.chunks)) + " chunks · " +
-          esc(new Date(d.addedAt || Date.now()).toLocaleDateString("en", { month: "short", day: "numeric" })) +
-          ' · <button type="button" class="rd-scope" data-act="rag-scope" data-id="' + esc(d.id) + '" title="Toggle scope: this chat only / all chats">' +
-          (scoped ? "this chat" : "all chats") + "</button>" +
-          (inScope ? "" : ' <span class="rd-out-tag">not in this chat</span>') +
-          "</div></div>" +
-          '<button type="button" class="rd-del" data-act="rag-del" data-id="' + esc(d.id) + '" title="Delete document" aria-label="Delete ' + esc(d.name) + '">🗑</button>' +
-          "</div>"
-        );
-      })
-      .join("");
-    body.innerHTML =
-      '<div class="rd-usage">' +
-      esc(String(u.docs.length)) + " / " + u.maxDocs + " docs · " + esc(fmtFileSize(u.bytes)) + " of " +
-      esc(fmtFileSize(u.maxBytes)) + " indexed · " + esc(String(u.chunks)) + " chunks" +
-      "</div>" +
-      (u.docs.length ? '<div class="rd-list">' + rows + "</div>" : '<div class="rd-empty">No indexed documents yet.<br>Turn on 📚 and drop a large text file, code file, or codebase export.</div>') +
-      '<div class="sb-actions"><button class="btn-sm" data-act="rag-add">Add files…</button></div>' +
-      '<p class="sb-key-help">Docs stay in this browser (IndexedDB) and are retrieved per message while 📚 is on — top matching excerpts are injected as context, never the whole file. Scope a doc to this chat or all chats. Deleting a chat also deletes its scoped docs.</p>';
-  });
-}
-function openRagManager() {
-  const trigger = document.activeElement;
-  dismissLanding();
-  renderRagManager();
-  openModalOverlay("rdOverlay", trigger);
-}
-function closeRagManager() {
-  closeModalOverlay("rdOverlay");
-}
-function rdBodyClick(e) {
-  const add = e.target.closest('[data-act="rag-add"]');
-  if (add) {
-    $("ragFile").click();
-    return;
-  }
-  const del = e.target.closest('[data-act="rag-del"]');
-  if (del) {
-    ragRemoveDoc(del.dataset.id);
-    return;
-  }
-  const sc = e.target.closest('[data-act="rag-scope"]');
-  if (sc) {
-    ragScopeDoc(sc.dataset.id);
-    return;
-  }
-}
-async function ragRemoveDoc(id) {
-  try {
-    await ragDeleteDoc(id);
-  } catch (e) {
-    logRot("📚 Delete failed: " + (e.message || "storage error"), "err");
-    return;
-  }
-  ragCache.delete(id);
-  const i = ragRecent.findIndex((r) => r.id === id);
-  if (i >= 0) {
-    ragRecent.splice(i, 1);
-    renderPreviews();
-  }
-  logRot("📚 Document deleted", "evt");
-  renderRagManager();
-  ragSyncFrame();
-}
-async function ragScopeDoc(id) {
-  const docs = await ragListDocs();
-  const d = docs.find((x) => x.id === id);
-  if (!d) return;
-  if (d.chatId) delete d.chatId;
-  else {
-    if (!getActiveChat()) ensureChat(); // scope to a conversation that starts now
-    d.chatId = activeChatId;
-  }
-  try {
-    await ragPut("docs", d);
-  } catch (e) {
-    logRot("📚 Scope change failed: " + (e.message || "storage error"), "err");
-    return;
-  }
-  logRot("📚 " + d.name + " → " + (d.chatId ? "this chat only" : "all chats"), "evt");
-  renderRagManager();
-}
-/* When a chat dies, its scoped docs are dead weight — remove them too. */
-function ragDeleteChatDocs(chatId) {
-  if (!chatId || !ragAvailable()) return;
-  ragListDocs()
-    .then((docs) =>
-      Promise.all(docs.filter((d) => d.chatId === chatId).map((d) => ragRemoveDoc(d.id)))
-    )
-    .catch(() => {});
-}
-
-/* Init hook called from app.js. */
-function initRag() {
-  syncRagUI();
 }
 
 /* ═══ js/extras.js ═══ */
@@ -8776,7 +7858,7 @@ function renderFollowups(c, msgIdx) {
 /* ── Modals ── */
 const FOCUSABLE =
   'a[href],area[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
-const MODAL_IDS = ["mpOverlay", "stOverlay", "cpOverlay", "rdOverlay"];
+const MODAL_IDS = ["mpOverlay", "stOverlay", "cpOverlay"];
 let lastFocus = null;
 function openModalNow() {
   return (
@@ -8870,7 +7952,6 @@ function onGlobalKeydown(e) {
     if (id === "mpOverlay") closeModelPicker();
     else if (id === "stOverlay") closeSettings();
     else if (id === "cpOverlay") closeChatPrompt();
-    else if (id === "rdOverlay") closeRagManager();
     return;
   }
   // Trap Tab inside the open dialog so focus never escapes to the page behind.
@@ -9037,19 +8118,12 @@ function bindEvents() {
   // Sidebar conversation list.
   $("sbList").addEventListener("click", sbListClick);
   $("sbList").addEventListener("dblclick", sbListDblClick);
-  // Staged attachments + indexed-doc chips: remove buttons carry their index.
+  // Staged attachments: remove buttons carry their index.
   $("previewStrip").addEventListener("click", (e) => {
     const b = e.target.closest("[data-act]");
     if (!b) return;
     if (b.dataset.act === "remove-image") removeImage(+b.dataset.i);
     else if (b.dataset.act === "remove-file") removeFile(+b.dataset.i);
-    else if (b.dataset.act === "remove-rag") ragDeleteChip(+b.dataset.i);
-  });
-  // Doc manager rows: scope toggle / delete / add delegate inside the modal body.
-  $("rdBody").addEventListener("click", rdBodyClick);
-  $("ragFile").addEventListener("change", (e) => {
-    ragIndexFiles(e.target.files);
-    e.target.value = "";
   });
   // Chat surface: follow-up chips first, then data-act buttons, then the
   // thinking disclosure — ordered with early returns so one click = one action.
@@ -9191,7 +8265,6 @@ window.addEventListener("resize", () => {
   initImageDrop();
   syncSearchUI();
   setAttachUI();
-  initRag();
   refreshCatalog().then(refreshNativeCatalogs);
   setInterval(() => {
     refreshCatalog().then(refreshNativeCatalogs);

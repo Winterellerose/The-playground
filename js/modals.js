@@ -4,7 +4,7 @@
 /* ── Modals ── */
 const FOCUSABLE =
   'a[href],area[href],button:not([disabled]),input:not([disabled]),select:not([disabled]),textarea:not([disabled]),[tabindex]:not([tabindex="-1"])';
-const MODAL_IDS = ["mpOverlay", "stOverlay", "cpOverlay", "rdOverlay"];
+const MODAL_IDS = ["mpOverlay", "stOverlay", "cpOverlay"];
 let lastFocus = null;
 function openModalNow() {
   return (
@@ -98,7 +98,6 @@ function onGlobalKeydown(e) {
     if (id === "mpOverlay") closeModelPicker();
     else if (id === "stOverlay") closeSettings();
     else if (id === "cpOverlay") closeChatPrompt();
-    else if (id === "rdOverlay") closeRagManager();
     return;
   }
   // Trap Tab inside the open dialog so focus never escapes to the page behind.

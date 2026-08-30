@@ -125,19 +125,12 @@ function bindEvents() {
   // Sidebar conversation list.
   $("sbList").addEventListener("click", sbListClick);
   $("sbList").addEventListener("dblclick", sbListDblClick);
-  // Staged attachments + indexed-doc chips: remove buttons carry their index.
+  // Staged attachments: remove buttons carry their index.
   $("previewStrip").addEventListener("click", (e) => {
     const b = e.target.closest("[data-act]");
     if (!b) return;
     if (b.dataset.act === "remove-image") removeImage(+b.dataset.i);
     else if (b.dataset.act === "remove-file") removeFile(+b.dataset.i);
-    else if (b.dataset.act === "remove-rag") ragDeleteChip(+b.dataset.i);
-  });
-  // Doc manager rows: scope toggle / delete / add delegate inside the modal body.
-  $("rdBody").addEventListener("click", rdBodyClick);
-  $("ragFile").addEventListener("change", (e) => {
-    ragIndexFiles(e.target.files);
-    e.target.value = "";
   });
   // Chat surface: follow-up chips first, then data-act buttons, then the
   // thinking disclosure — ordered with early returns so one click = one action.

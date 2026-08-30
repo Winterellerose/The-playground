@@ -265,7 +265,7 @@ function renderModelPicker() {
 function selectModel(id, close) {
   if (!MODELS[id]) return;
   selectedModel = id;
-  localStorage.setItem("selectedModel", id);
+  localStorage.setItem("selected_model", id);
   const m = MODELS[id];
   $("heroModel").textContent = m.badge.toUpperCase();
   $("heroCtx").textContent = m.ctx || "—";

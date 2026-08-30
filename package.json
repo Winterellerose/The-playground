@@ -1,6 +1,6 @@
 {
   "name": "the-playground",
-  "version": "3.0.0",
+  "version": "2.9.3",
   "private": true,
   "description": "Multi-provider AI studio — single-file artifact built from modular source",
   "scripts": {

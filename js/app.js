@@ -90,7 +90,6 @@ window.addEventListener("resize", () => {
   initImageDrop();
   syncSearchUI();
   setAttachUI();
-  initRag();
   refreshCatalog().then(refreshNativeCatalogs);
   setInterval(() => {
     refreshCatalog().then(refreshNativeCatalogs);

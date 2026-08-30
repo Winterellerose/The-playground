@@ -124,20 +124,6 @@ async function addImageFiles(files) {
 }
 async function addTextFiles(files) {
   const list = [...(files || [])].filter(Boolean);
-  // 📚 Doc-indexing mode: oversized text files become searchable documents
-  // instead of failing the size check — BM25 retrieval substitutes for
-  // inlining. Small files still ride inline below.
-  if (ragModeOn()) {
-    const big = list.filter((f) => f && f.size > FILE_MAX_BYTES && isSupportedTextFile(f));
-    const small = list.filter((f) => !(f && f.size > FILE_MAX_BYTES && isSupportedTextFile(f)));
-    if (big.length) await ragIndexFiles(big);
-    await addInlineTextFiles(small);
-    return;
-  }
-  await addInlineTextFiles(list);
-}
-async function addInlineTextFiles(files) {
-  const list = [...(files || [])].filter(Boolean);
   for (const f of list) {
     if (pendingFiles.length >= MAX_FILES) {
       logRot(`Max ${MAX_FILES} files per message`, "warn");
@@ -192,10 +178,9 @@ function renderPreviews() {
     )
     .join("");
   const files = pendingFiles.map((f, i) => fileChipHtml(f, i)).join("");
-  const rag = ragChipsHtml();
-  s.innerHTML = imgs + files + rag;
+  s.innerHTML = imgs + files;
   userInput.placeholder =
-    pendingImages.length || pendingFiles.length || ragRecent.length
+    pendingImages.length || pendingFiles.length
       ? "Add a message (optional)…"
       : "Send a message…";
 }
