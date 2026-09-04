@@ -5581,11 +5581,28 @@ async function testKey(pid) {
       btn.textContent = "OK ✓";
       btn.className = "btn-test ok";
       logRot(`${REG[pid].name} key valid`, "ok");
-    } else throw new Error(res.status);
+      return;
+    }
+    // Pull NVIDIA's real reason (401/403 = key rejected, 404 = endpoint/catalog,
+    // etc.) instead of hiding it behind the button label "Fail".
+    let why = String(res.status);
+    try {
+      const t = await res.text();
+      try {
+        const j = JSON.parse(t);
+        why = (j && (j.error && j.error.message)) || (j && j.message) || why;
+      } catch {
+        if (t) why = t;
+      }
+    } catch {}
+    if (String(why) === String(res.status)) why = "HTTP " + res.status;
+    throw new Error(why);
   } catch (e) {
     setDot(pid, "bad");
     btn.textContent = "Fail";
     btn.className = "btn-test err";
+    // 'Failed to fetch' / 'NetworkError' => the browser never got an HTTP answer
+    // (CORS or connectivity), which is a different problem from a key rejection.
     logRot(`${REG[pid].name} key test failed (${e.message})`, "err");
   }
 }
