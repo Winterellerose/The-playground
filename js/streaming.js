@@ -2,7 +2,10 @@
 /* ═══ streaming.js — input handling, streaming core, send/run ═══ */
 
 /* ── Input ── */
+let voiceRec=null, voiceOn=false, historyPos=-1;
+function toggleVoice() { const R=window.SpeechRecognition||window.webkitSpeechRecognition; if(!R) return; if(voiceOn) return voiceRec.stop(); voiceRec=new R(); voiceRec.lang=navigator.language; voiceRec.interimResults=true; let base=userInput.value; voiceRec.onresult=(e)=>{ let t=""; for(let i=e.resultIndex;i<e.results.length;i++) t+=e.results[i][0].transcript; userInput.value=(base && !/\s$/.test(base)?base+" ":base)+t; autoResizeInput(); }; voiceRec.onend=()=>{voiceOn=false; $("micBtn").classList.remove("on")}; voiceRec.onerror=()=>{logRot("Voice input failed", "warn"); voiceOn=false; $("micBtn").classList.remove("on")}; voiceOn=true; $("micBtn").classList.add("on"); voiceRec.start(); }
 function handleKey(e) {
+  if ((e.key === "ArrowUp" || e.key === "ArrowDown") && (!userInput.value || userInput.selectionStart === 0)) { const a=(getActiveChat()?.messages||[]).filter(x=>x.role === "user"); if(a.length) { e.preventDefault(); historyPos=e.key === "ArrowUp" ? Math.max(0,historyPos < 0 ? a.length-1 : historyPos-1) : Math.min(a.length,historyPos+1); userInput.value=historyPos<a.length?(a[historyPos].content||""):""; autoResizeInput(); } return; }
   if (e.key === "Tab") {
     e.preventDefault();
     const s = userInput.selectionStart,
@@ -421,6 +424,7 @@ async function runCompletion(c, regenIdx) {
   userStop = false;
 }
 async function sendMessage() {
+  if (voiceOn && voiceRec) voiceRec.stop();
   const text = userInput.value.trim();
   const imgs = pendingImages.slice();
   const files = pendingFiles.map((f) => ({

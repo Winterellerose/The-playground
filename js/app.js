@@ -103,3 +103,5 @@ window.addEventListener("resize", () => {
   );
   if (!nKeys) setTimeout(openSettings, 1600);
 })();
+
+if (window.SpeechRecognition || window.webkitSpeechRecognition) { const b=$("micBtn"); if(b) b.hidden=false; }

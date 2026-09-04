@@ -92,6 +92,9 @@ function onGlobalKeydown(e) {
     dismissLanding();
     return;
   }
+  const typing = /INPUT|TEXTAREA|SELECT/.test((e.target && e.target.tagName) || "");
+  if (!typing && !openModalNow() && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); openModelPicker(); return; }
+  if (!typing && !openModalNow() && (e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "o") { e.preventDefault(); newChat(); return; }
   const ov = openModalNow();
   if (e.key === "Escape" && ov) {
     const id = MODAL_IDS.find((x) => $(x) === ov);

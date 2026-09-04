@@ -51,10 +51,8 @@ function buildRequest(cfg, hist) {
     } else rb.temperature = cfg.temp;
     return { h, rb };
   }
-  const h = {
-    "Content-Type": "application/json",
-    Authorization: "Bearer " + cfg.apiKey,
-  };
+  const h = { "Content-Type": "application/json" };
+  if (!REG[pid].local) h.Authorization = "Bearer " + cfg.apiKey;
   const rb = {
     model: cfg.modelId,
     messages: sys ? [{ role: "system", content: sys }, ...wire] : wire,
@@ -110,22 +108,8 @@ function wireHist(hist, cfg) {
   });
 }
 function cleanHistory(c, targetIdx) {
-  return c.messages
-    .slice(0, targetIdx)
-    .filter(
-      (x) =>
-        (x.role === "user" &&
-          ((x.content && x.content.trim()) ||
-            (x.images && x.images.length) ||
-            (x.files && x.files.length))) ||
-        (x.role === "assistant" &&
-          ((x.content || "").trim() || (x.thinking || "").trim())),
-    )
-    .slice(-60)
-    .map((x) => {
-      const o = { role: x.role, content: x.content || "" };
-      if (x.role === "user" && x.images && x.images.length) o.images = x.images;
-      if (x.role === "user" && x.files && x.files.length) o.files = x.files;
-      return o;
-    });
+  let h = c.messages.slice(0, targetIdx).filter((x) => (x.role === "user" && ((x.content||"").trim() || (x.images&&x.images.length) || (x.files&&x.files.length))) || (x.role === "assistant" && ((x.content||"").trim() || (x.thinking||"").trim())));
+  const model = MODELS[c.model || selectedModel] || {}, raw = String(model.ctx || ""), ctx = Number(raw.replace(/[^0-9]/g, "")) * (/k/i.test(raw) ? 1000 : 1);
+  if (!ctx) h = h.slice(-60); else { const max=Math.max(1,(ctx-(parseInt($("maxTok").value)||8192))*.95); const tok=()=>h.reduce((n,x)=>n+Math.ceil(((x.content||"")+(x.thinking||"")).length/4),0); while(h.length>1 && tok()>max) h.shift(); if(h[0] && h[0].role === "assistant") h.shift(); }
+  return h.map((x) => { const o={role:x.role,content:x.content||""}; if(x.role === "user" && x.images) o.images=x.images; if(x.role === "user" && x.files) o.files=x.files; return o; });
 }

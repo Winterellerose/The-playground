@@ -281,6 +281,7 @@ function selectModel(id, close) {
     tog.classList.remove("on", "disabled");
   } // models without manual thinking: toggle off + locked-looking off
   syncToggle(tog);
+  updateUsageMeter();
   const pill = $("statusPill");
   pill.className = "status-pill " + (m.isFree ? "free" : "paid");
   pill.innerHTML = `<span class="dot"></span>${m.isFree ? "Free" : "Paid"}`;
@@ -299,4 +300,10 @@ function toggleThinking() {
   if (t.classList.contains("disabled")) return;
   t.classList.toggle("on");
   syncToggle(t);
+}
+function updateUsageMeter() {
+  const c=getActiveChat(), m=MODELS[selectedModel]||{}, ctx=Number(String(m.ctx||'').replace(/[^0-9]/g,''))*(/k/i.test(String(m.ctx||''))?1000:1);
+  const used=(c?.messages||[]).reduce((n,x)=>n+(x.meta&&Number(x.meta.in)+Number(x.meta.out)||Math.ceil(String(x.content||'').length/4)),0);
+  const cost=(c?.messages||[]).reduce((n,x)=>n+(x.meta&&REG[x.meta.p]&&REG[x.meta.p].metered ? 0 : 0),0);
+  const el=$("frameMeta"); if(el) el.textContent="— "+REG[m.provider]?.name?.toUpperCase()+" · "+m.badge?.toUpperCase()+" · "+(ctx?Math.round(used/1000)+"k / "+Math.round(ctx/1000)+"k":"est. —")+(REG[m.provider]?.type === "free" || REG[m.provider]?.local ? " · free" : " · est. cost");
 }

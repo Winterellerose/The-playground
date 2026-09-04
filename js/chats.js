@@ -3,6 +3,7 @@
 
 /* ── Chats ── */
 function saveChats() {
+  const active=getActiveChat(); if(active) moveLargeImages(active).then(() => { try { localStorage.setItem("chat_history", JSON.stringify(chats)); } catch {} });
   try {
     localStorage.setItem("chat_history", JSON.stringify(chats));
     return true;
@@ -20,7 +21,7 @@ function renderSidebar() {
   const list = $("sbList");
   const items = [...chats]
     .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
-    .filter((c) => !q || (c.title || "").toLowerCase().includes(q));
+    .filter((c) => { if (!q) return true; const title=(c.title||"").toLowerCase(); if(title.includes(q)) return true; for(const m of c.messages||[]) if(String(m.content||"").toLowerCase().includes(q)) return true; return false; });
   if (!items.length) {
     list.innerHTML =
       '<div class="sb-empty">' +
@@ -43,7 +44,8 @@ function renderSidebar() {
           ? '<span class="sb-sp" title="Has its own system prompt">📝</span>'
           : "";
       const ttl = esc(c.title || "New chat");
-      return `<div class="sb-item${c.id === activeChatId ? " active" : ""}" data-cid="${esc(c.id)}" tabindex="0" role="button" aria-label="Open conversation: ${ttl}"><span class="sb-title">${ttl}</span><span class="sb-meta">${sp}<span class="sb-model-tag">${esc(badge)}</span>${date}</span><button class="sb-del" title="Delete" aria-label="Delete conversation: ${ttl}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button></div>`;
+      let snippet=""; if(q && !(c.title||"").toLowerCase().includes(q)) { for(const x of c.messages||[]) { const v=String(x.content||""), at=v.toLowerCase().indexOf(q); if(at>=0) { snippet=`<span class="sb-snippet">${esc(v.slice(Math.max(0,at-20),at))}<mark>${esc(v.slice(at,at+q.length))}</mark>${esc(v.slice(at+q.length,at+40))}</span>`; break; } } }
+      return `<div class="sb-item${c.id === activeChatId ? " active" : ""}" data-cid="${esc(c.id)}" tabindex="0" role="button" aria-label="Open conversation: ${ttl}"><span class="sb-title">${ttl}</span><span class="sb-meta">${sp}<span class="sb-model-tag">${esc(badge)}</span>${date}${snippet}</span><button class="sb-del" title="Delete" aria-label="Delete conversation: ${ttl}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button></div>`;
     })
     .join("");
 }
@@ -100,6 +102,7 @@ function loadChat(id) {
   if (!c) return;
   activeChatId = id;
   localStorage.setItem("active_chat_id", id);
+  if ((c.messages||[]).some((m)=>(m.images||[]).some(idbRef))) { hydrateImages(c).then(() => loadChat(id)); return; }
   if (c.model && MODELS[c.model]) selectModel(c.model, false);
   chatWrap.innerHTML = "";
   chatWrap.appendChild(welcome);
@@ -112,6 +115,7 @@ function loadChat(id) {
   resetScrollPin();
   renderSidebar();
   syncChatPromptUI();
+  updateUsageMeter();
   scrollToBottom();
 }
 function deleteChat(id) {
@@ -369,3 +373,11 @@ function pickFollowup(q) {
   userInput.focus();
   sendMessage();
 }
+
+/* Current-chat portable exports; IDB images are hydrated before serialization. */
+function exportCurrentChat(kind) {
+  const c = getActiveChat(); if (!c) return logRot("No chat to export", "warn");
+  hydrateImages(c).then(() => { const date=new Date().toISOString().slice(0,10), slug=(c.title||"chat").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"chat"; const md=chatMarkdown(c,date); const data=kind === "html" ? chatHtml(c,md) : md; const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([data],{type:kind === "html" ? "text/html" : "text/markdown"})); a.download=slug+"-"+date+"."+kind; a.click(); URL.revokeObjectURL(a.href); });
+}
+function chatMarkdown(c,date) { const model=(MODELS[c.model]||{}).name||c.model||"model"; return "# "+c.title+"\n\nModel: "+model+" · Exported: "+date+"\n"+(c.messages||[]).map(m=>"\n## "+(m.role === "user" ? "You" : model)+"\n\n"+(m.content||"")+(m.thinking?"\n\n<details><summary>Thinking</summary>\n\n"+m.thinking+"\n\n</details>":"")+(m.sources?"\n\n"+m.sources.map(x=>"- ["+(x.title||x.url)+"]("+x.url+")").join("\n"):"")+(m.files?"\n\n"+m.files.map(f=>"```\n"+f.name+"\n"+f.text+"\n```").join("\n"):"")+(m.images?"\n\n"+m.images.filter(x=>typeof x === "string").map(x=>"![]("+x+")").join("\n"):"")).join("\n"); }
+function chatHtml(c,md) { return '<!doctype html><meta charset="utf-8"><title>'+esc(c.title)+'</title><style>body{max-width:900px;margin:3rem auto;padding:0 1rem;background:#111714;color:#e7ece8;font:16px system-ui}pre{white-space:pre-wrap;background:#1b2420;padding:1rem;border-radius:8px}a{color:#7ec8b4}img{max-width:100%}</style><pre>'+esc(md)+'</pre>'; }
