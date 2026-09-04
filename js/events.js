@@ -26,8 +26,7 @@ const ACT = {
   "attach": () => attachClick(),
   "test-key": (b) => testKey(b.dataset.pid),
   "jump-latest": () => jumpToLatest(),
-  "export-md": () => exportCurrentChat("md"),
-  "export-html": () => exportCurrentChat("html"),
+  
   "voice": () => toggleVoice(),
 };
 

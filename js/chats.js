@@ -374,10 +374,4 @@ function pickFollowup(q) {
   sendMessage();
 }
 
-/* Current-chat portable exports; IDB images are hydrated before serialization. */
-function exportCurrentChat(kind) {
-  const c = getActiveChat(); if (!c) return logRot("No chat to export", "warn");
-  hydrateImages(c).then(() => { const date=new Date().toISOString().slice(0,10), slug=(c.title||"chat").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"chat"; const md=chatMarkdown(c,date); const data=kind === "html" ? chatHtml(c,md) : md; const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([data],{type:kind === "html" ? "text/html" : "text/markdown"})); a.download=slug+"-"+date+"."+kind; a.click(); URL.revokeObjectURL(a.href); });
-}
-function chatMarkdown(c,date) { const model=(MODELS[c.model]||{}).name||c.model||"model"; return "# "+c.title+"\n\nModel: "+model+" · Exported: "+date+"\n"+(c.messages||[]).map(m=>"\n## "+(m.role === "user" ? "You" : model)+"\n\n"+(m.content||"")+(m.thinking?"\n\n<details><summary>Thinking</summary>\n\n"+m.thinking+"\n\n</details>":"")+(m.sources?"\n\n"+m.sources.map(x=>"- ["+(x.title||x.url)+"]("+x.url+")").join("\n"):"")+(m.files?"\n\n"+m.files.map(f=>"```\n"+f.name+"\n"+f.text+"\n```").join("\n"):"")+(m.images?"\n\n"+m.images.filter(x=>typeof x === "string").map(x=>"![]("+x+")").join("\n"):"")).join("\n"); }
-function chatHtml(c,md) { return '<!doctype html><meta charset="utf-8"><title>'+esc(c.title)+'</title><style>body{max-width:900px;margin:3rem auto;padding:0 1rem;background:#111714;color:#e7ece8;font:16px system-ui}pre{white-space:pre-wrap;background:#1b2420;padding:1rem;border-radius:8px}a{color:#7ec8b4}img{max-width:100%}</style><pre>'+esc(md)+'</pre>'; }
+

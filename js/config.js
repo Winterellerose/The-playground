@@ -3,7 +3,7 @@
 "use strict";
 /* ════════════════════════════════════════════════════════════
    THE PLAYGROUND v3.0.0 — multi-provider AI studio (single file)
-   v3.0.0: PWA/offline shell; Ollama + LM Studio local models; full-text chat search; Markdown/HTML chat export; keyboard shortcuts and voice input; context/cost estimates; IndexedDB large-image storage; token-aware history; CI, Pages and model audit; stale duplicate tree removed and README added.
+   v3.0.0: PWA/offline shell; Ollama + LM Studio local models; full-text chat search; keyboard shortcuts and voice input; context/cost estimates; IndexedDB large-image storage; token-aware history; CI, Pages and model audit; stale duplicate tree removed and README added.
    v2.9.4: sticky scroll — auto-scroll pauses when you scroll up to reread during a stream; a ↓ Latest pill returns to the newest message. Sending, regenerating or switching chats re-engages the chase.
    v2.9.3: accessibility — every icon-only control carries a real
    accessible name (aria-label); the landing, model cards, sidebar rows,

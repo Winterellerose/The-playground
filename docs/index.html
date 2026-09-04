@@ -3743,7 +3743,7 @@ header {
         <div class="dots"><span></span><span></span><span></span></div>
         <span class="frame-title">THE PLAYGROUND</span>
         <span class="frame-meta" id="frameMeta">—</span>
-        <button class="frame-prompt" data-act="export-md" title="Export Markdown">MD</button><button class="frame-prompt" data-act="export-html" title="Export HTML">HTML</button><button class="frame-prompt" id="chatPromptBtn" data-act="open-chat-prompt" title="System prompt for THIS conversation only — layers on top of the global one from Settings"><span aria-hidden="true">📝</span><span id="chatPromptState">Prompt</span></button>
+        <button class="frame-prompt" id="chatPromptBtn" data-act="open-chat-prompt" title="System prompt for THIS conversation only — layers on top of the global one from Settings"><span aria-hidden="true">📝</span><span id="chatPromptState">Prompt</span></button>
       </div>
       <div class="chat-wrap" id="chatWrap">
         <div class="welcome" id="welcome">
@@ -3786,7 +3786,7 @@ header {
 "use strict";
 /* ════════════════════════════════════════════════════════════
    THE PLAYGROUND v3.0.0 — multi-provider AI studio (single file)
-   v3.0.0: PWA/offline shell; Ollama + LM Studio local models; full-text chat search; Markdown/HTML chat export; keyboard shortcuts and voice input; context/cost estimates; IndexedDB large-image storage; token-aware history; CI, Pages and model audit; stale duplicate tree removed and README added.
+   v3.0.0: PWA/offline shell; Ollama + LM Studio local models; full-text chat search; keyboard shortcuts and voice input; context/cost estimates; IndexedDB large-image storage; token-aware history; CI, Pages and model audit; stale duplicate tree removed and README added.
    v2.9.4: sticky scroll — auto-scroll pauses when you scroll up to reread during a stream; a ↓ Latest pill returns to the newest message. Sending, regenerating or switching chats re-engages the chase.
    v2.9.3: accessibility — every icon-only control carries a real
    accessible name (aria-label); the landing, model cards, sidebar rows,
@@ -6913,13 +6913,7 @@ function pickFollowup(q) {
   sendMessage();
 }
 
-/* Current-chat portable exports; IDB images are hydrated before serialization. */
-function exportCurrentChat(kind) {
-  const c = getActiveChat(); if (!c) return logRot("No chat to export", "warn");
-  hydrateImages(c).then(() => { const date=new Date().toISOString().slice(0,10), slug=(c.title||"chat").toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")||"chat"; const md=chatMarkdown(c,date); const data=kind === "html" ? chatHtml(c,md) : md; const a=document.createElement("a"); a.href=URL.createObjectURL(new Blob([data],{type:kind === "html" ? "text/html" : "text/markdown"})); a.download=slug+"-"+date+"."+kind; a.click(); URL.revokeObjectURL(a.href); });
-}
-function chatMarkdown(c,date) { const model=(MODELS[c.model]||{}).name||c.model||"model"; return "# "+c.title+"\n\nModel: "+model+" · Exported: "+date+"\n"+(c.messages||[]).map(m=>"\n## "+(m.role === "user" ? "You" : model)+"\n\n"+(m.content||"")+(m.thinking?"\n\n<details><summary>Thinking</summary>\n\n"+m.thinking+"\n\n</details>":"")+(m.sources?"\n\n"+m.sources.map(x=>"- ["+(x.title||x.url)+"]("+x.url+")").join("\n"):"")+(m.files?"\n\n"+m.files.map(f=>"```\n"+f.name+"\n"+f.text+"\n```").join("\n"):"")+(m.images?"\n\n"+m.images.filter(x=>typeof x === "string").map(x=>"![]("+x+")").join("\n"):"")).join("\n"); }
-function chatHtml(c,md) { return '<!doctype html><meta charset="utf-8"><title>'+esc(c.title)+'</title><style>body{max-width:900px;margin:3rem auto;padding:0 1rem;background:#111714;color:#e7ece8;font:16px system-ui}pre{white-space:pre-wrap;background:#1b2420;padding:1rem;border-radius:8px}a{color:#7ec8b4}img{max-width:100%}</style><pre>'+esc(md)+'</pre>'; }
+
 
 /* ═══ js/messages.js ═══ */
 "use strict";
@@ -8115,8 +8109,7 @@ const ACT = {
   "attach": () => attachClick(),
   "test-key": (b) => testKey(b.dataset.pid),
   "jump-latest": () => jumpToLatest(),
-  "export-md": () => exportCurrentChat("md"),
-  "export-html": () => exportCurrentChat("html"),
+  
   "voice": () => toggleVoice(),
 };
 

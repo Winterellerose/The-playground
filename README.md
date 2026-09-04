@@ -5,7 +5,7 @@ A private, multi-provider AI studio built into one portable single-file artifact
 `npm run build`, then open `docs/index.html` directly. Use `npm run dev` for a localhost server.
 
 ## Features
-Provider rotation, live catalogs, vision and text attachments, web search, per-chat prompts, full-text search, Markdown/HTML/JSON export, speech input, keyboard shortcuts, usage/cost estimates, PWA offline shell, and local models.
+Provider rotation, live catalogs, vision and text attachments, web search, per-chat prompts, full-text search, JSON chat export, speech input, keyboard shortcuts, usage/cost estimates, PWA offline shell, and local models.
 
 ## Providers
 | Tier | Providers | Endpoint / limits |
