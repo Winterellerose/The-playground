@@ -3786,6 +3786,11 @@ header {
 "use strict";
 /* ════════════════════════════════════════════════════════════
    THE PLAYGROUND v3.0.0 — multi-provider AI studio (single file)
+   v3.0.1: added NVIDIA NIM kimi-k3 (moonshotai/kimi-k3) — free, 1M ctx, native
+   vision + always-on reasoning. It accepts reasoning_effort low|high|max (no
+   thinking toggle), so effort:"openai" forwards the chosen effort and the toggle
+   renders on+locked; skipRec stops the OpenRouter-catalog reconcile (same id is
+   paid there) from re-labeling the free NVIDIA entry.
    v3.0.0: PWA/offline shell; Ollama + LM Studio local models; full-text chat search; keyboard shortcuts and voice input; context/cost estimates; IndexedDB large-image storage; token-aware history; CI, Pages and model audit; stale duplicate tree removed and README added.
    v2.9.4: sticky scroll — auto-scroll pauses when you scroll up to reread during a stream; a ↓ Latest pill returns to the newest message. Sending, regenerating or switching chats re-engages the chase.
    v2.9.3: accessibility — every icon-only control carries a real
@@ -4385,6 +4390,24 @@ const MODELS = {
     intel: 4,
     ctx: "163K",
     desc: "V4-Flash MoE on NVIDIA infra. FREE.",
+  },
+  "nv-kimi-k3": {
+    name: "Kimi K3",
+    badge: "KIMI K3",
+    group: "nvidia",
+    provider: "nvidia",
+    apiId: "moonshotai/kimi-k3",
+    isFree: true,
+    intel: 5,
+    ctx: "1M",
+    vision: true,
+    // Always-on reasoner on NVIDIA NIM: no thinking on/off — NVIDIA only takes
+    // reasoning_effort (low|high|max). effort:"openai" sends that field (no
+    // thinking wrapper); skipRec keeps the (also-paid on OpenRouter) id from
+    // being re-labeled paid by the OR-catalog reconcile.
+    effort: "openai",
+    skipRec: true,
+    desc: "Moonshot 2.8T open multimodal MoE on NVIDIA NIM. Native vision, always-on thinking (low/high/max effort). FREE tier.",
   },
   /* ── DeepSeek ── */
   "ds-v4f": {
@@ -5245,6 +5268,11 @@ function applyCatalog(list) {
   const ghosts = [];
   Object.entries(MODELS).forEach(([k, m]) => {
     if (m.live || m.custom) return;
+    // skipRec: hand-written entry whose apiId is also sold on OpenRouter under
+    // a *different* price/host than the curated provider (e.g. NVIDIA NIM hosts
+    // moonshotai/kimi-k3 free, while the same id is paid-only on OpenRouter).
+    // Leave its flags as authored instead of "correcting" them to the OR price.
+    if (m.skipRec) return;
     const onOR =
       m.provider === "openrouter" || m.provider === "openrouter_paid";
     const real = realMap.get(m.apiId);
@@ -6026,7 +6054,9 @@ function selectModel(id, close) {
     "— " + REG[m.provider].name.toUpperCase() + " · " + m.badge.toUpperCase();
   $("welcomeModel").textContent = m.name;
   const tog = $("thinkingToggle");
-  if (m.adaptive) {
+  if (m.adaptive || m.effort) {
+    // always-on reasoning (adaptive models, or effort: "openai" always-reasoners
+    // like NVIDIA kimi-k3): toggle shown on + locked — the model decides to think.
     tog.classList.add("on", "disabled");
   } else if (m.thinking === true) {
     tog.classList.remove("disabled");
@@ -7098,14 +7128,24 @@ function showError(msg, retryFn) {
 
 /* ── Request builders ── */
 function mapEffort(e, pid) {
-  if (pid === "deepseek")
+  if (pid === "deepseek" || pid === "nvidia")
+    // NVIDIA NIM reasoning vocab is low|high|max (see kimi-k3): fold app medium in.
     return e === "low" ? "low" : e === "max" ? "max" : "high";
   return e === "max" || e === "xhigh" ? "high" : e;
 }
 function applyReasoning(rb, pid, cfg, m) {
+  const st = REG[pid].style;
+  // Always-on reasoners served through an OpenAI-style reasoning_effort field
+  // (e.g. NVIDIA NIM's kimi-k3, whose "none" style tunnels params straight through):
+  // thinking can't be toggled off, so forward the chosen effort in the API's own
+  // vocabulary and never send a thinking wrapper. OpenRouter (or) and DeepSeek (ds)
+  // speak a different grammar, so leave those alone if the model rotates there.
+  if (m.effort === "openai" && st !== "or" && st !== "ds") {
+    rb.reasoning_effort = mapEffort(cfg.effort, pid);
+    return true;
+  }
   const capable = m.thinking === true && !m.adaptive; // only models that actually support manual thinking
   const on = cfg.thinking && capable;
-  const st = REG[pid].style;
   if (st === "ds") {
     rb.thinking = { type: on ? "enabled" : "disabled" };
     if (on) rb.reasoning_effort = mapEffort(cfg.effort, pid);
@@ -7767,6 +7807,7 @@ async function metaChat(messages, m, mode = getExtrasMode()) {
       else if (st === "or") body.reasoning = { effort: "low" };
       else if (st === "openai" || st === "gemini")
         body.reasoning_effort = "low";
+      else if (pid === "nvidia") body.reasoning_effort = "low"; // kimi-k3 always thinks — cap effort
       const ac = new AbortController();
       const to = setTimeout(() => ac.abort(), 15000);
       let res, txt;

@@ -3,14 +3,24 @@
 
 /* ── Request builders ── */
 function mapEffort(e, pid) {
-  if (pid === "deepseek")
+  if (pid === "deepseek" || pid === "nvidia")
+    // NVIDIA NIM reasoning vocab is low|high|max (see kimi-k3): fold app medium in.
     return e === "low" ? "low" : e === "max" ? "max" : "high";
   return e === "max" || e === "xhigh" ? "high" : e;
 }
 function applyReasoning(rb, pid, cfg, m) {
+  const st = REG[pid].style;
+  // Always-on reasoners served through an OpenAI-style reasoning_effort field
+  // (e.g. NVIDIA NIM's kimi-k3, whose "none" style tunnels params straight through):
+  // thinking can't be toggled off, so forward the chosen effort in the API's own
+  // vocabulary and never send a thinking wrapper. OpenRouter (or) and DeepSeek (ds)
+  // speak a different grammar, so leave those alone if the model rotates there.
+  if (m.effort === "openai" && st !== "or" && st !== "ds") {
+    rb.reasoning_effort = mapEffort(cfg.effort, pid);
+    return true;
+  }
   const capable = m.thinking === true && !m.adaptive; // only models that actually support manual thinking
   const on = cfg.thinking && capable;
-  const st = REG[pid].style;
   if (st === "ds") {
     rb.thinking = { type: on ? "enabled" : "disabled" };
     if (on) rb.reasoning_effort = mapEffort(cfg.effort, pid);

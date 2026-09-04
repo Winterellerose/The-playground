@@ -273,7 +273,9 @@ function selectModel(id, close) {
     "— " + REG[m.provider].name.toUpperCase() + " · " + m.badge.toUpperCase();
   $("welcomeModel").textContent = m.name;
   const tog = $("thinkingToggle");
-  if (m.adaptive) {
+  if (m.adaptive || m.effort) {
+    // always-on reasoning (adaptive models, or effort: "openai" always-reasoners
+    // like NVIDIA kimi-k3): toggle shown on + locked — the model decides to think.
     tog.classList.add("on", "disabled");
   } else if (m.thinking === true) {
     tog.classList.remove("disabled");

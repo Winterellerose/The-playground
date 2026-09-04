@@ -58,6 +58,11 @@ function applyCatalog(list) {
   const ghosts = [];
   Object.entries(MODELS).forEach(([k, m]) => {
     if (m.live || m.custom) return;
+    // skipRec: hand-written entry whose apiId is also sold on OpenRouter under
+    // a *different* price/host than the curated provider (e.g. NVIDIA NIM hosts
+    // moonshotai/kimi-k3 free, while the same id is paid-only on OpenRouter).
+    // Leave its flags as authored instead of "correcting" them to the OR price.
+    if (m.skipRec) return;
     const onOR =
       m.provider === "openrouter" || m.provider === "openrouter_paid";
     const real = realMap.get(m.apiId);

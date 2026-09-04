@@ -64,6 +64,7 @@ async function metaChat(messages, m, mode = getExtrasMode()) {
       else if (st === "or") body.reasoning = { effort: "low" };
       else if (st === "openai" || st === "gemini")
         body.reasoning_effort = "low";
+      else if (pid === "nvidia") body.reasoning_effort = "low"; // kimi-k3 always thinks — cap effort
       const ac = new AbortController();
       const to = setTimeout(() => ac.abort(), 15000);
       let res, txt;

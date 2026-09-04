@@ -3,6 +3,11 @@
 "use strict";
 /* ════════════════════════════════════════════════════════════
    THE PLAYGROUND v3.0.0 — multi-provider AI studio (single file)
+   v3.0.1: added NVIDIA NIM kimi-k3 (moonshotai/kimi-k3) — free, 1M ctx, native
+   vision + always-on reasoning. It accepts reasoning_effort low|high|max (no
+   thinking toggle), so effort:"openai" forwards the chosen effort and the toggle
+   renders on+locked; skipRec stops the OpenRouter-catalog reconcile (same id is
+   paid there) from re-labeling the free NVIDIA entry.
    v3.0.0: PWA/offline shell; Ollama + LM Studio local models; full-text chat search; keyboard shortcuts and voice input; context/cost estimates; IndexedDB large-image storage; token-aware history; CI, Pages and model audit; stale duplicate tree removed and README added.
    v2.9.4: sticky scroll — auto-scroll pauses when you scroll up to reread during a stream; a ↓ Latest pill returns to the newest message. Sending, regenerating or switching chats re-engages the chase.
    v2.9.3: accessibility — every icon-only control carries a real
@@ -602,6 +607,24 @@ const MODELS = {
     intel: 4,
     ctx: "163K",
     desc: "V4-Flash MoE on NVIDIA infra. FREE.",
+  },
+  "nv-kimi-k3": {
+    name: "Kimi K3",
+    badge: "KIMI K3",
+    group: "nvidia",
+    provider: "nvidia",
+    apiId: "moonshotai/kimi-k3",
+    isFree: true,
+    intel: 5,
+    ctx: "1M",
+    vision: true,
+    // Always-on reasoner on NVIDIA NIM: no thinking on/off — NVIDIA only takes
+    // reasoning_effort (low|high|max). effort:"openai" sends that field (no
+    // thinking wrapper); skipRec keeps the (also-paid on OpenRouter) id from
+    // being re-labeled paid by the OR-catalog reconcile.
+    effort: "openai",
+    skipRec: true,
+    desc: "Moonshot 2.8T open multimodal MoE on NVIDIA NIM. Native vision, always-on thinking (low/high/max effort). FREE tier.",
   },
   /* ── DeepSeek ── */
   "ds-v4f": {
