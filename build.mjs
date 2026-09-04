@@ -9,7 +9,7 @@
    Usage:  node build.mjs
    Output: docs/index.html  (fully self-contained, file:// safe)
    ════════════════════════════════════════════════════════════ */
-import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
 
@@ -56,6 +56,21 @@ if (/<link(?![^>]+fonts\.googleapis)[^>]+stylesheet/i.test(html)) fail('the styl
 
 mkdirSync(join(ROOT, 'docs'), { recursive: true });
 writeFileSync(join(ROOT, 'docs', 'index.html'), html);
+
+/* Copy PWA assets (manifest, service worker, icons) into docs/ so the
+   Pages deploy serves them alongside the single-file artifact. The app
+   itself stays fully self-contained — these only power install/offline. */
+const PWA_ASSETS = ['manifest.webmanifest', 'sw.js'];
+const PWA_DIRS = ['icons'];
+for (const rel of PWA_ASSETS) {
+    if (existsSync(join(ROOT, rel))) copyFileSync(join(ROOT, rel), join(ROOT, 'docs', rel));
+}
+for (const dir of PWA_DIRS) {
+    if (existsSync(join(ROOT, dir))) {
+        mkdirSync(join(ROOT, 'docs', dir), { recursive: true });
+        for (const f of readdirSync(join(ROOT, dir))) copyFileSync(join(ROOT, dir, f), join(ROOT, 'docs', dir, f));
+    }
+}
 console.log('\nBuilt docs/index.html (' + (html.length / 1024).toFixed(1) + ' KB — ' + ORDER.length + ' JS files + 2 vendored libs + CSS inlined)');
 console.log('Dev:  open index.html directly (file:// works)');
 console.log('Ship: docs/index.html is the self-contained artifact');
