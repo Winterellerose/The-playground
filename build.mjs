@@ -17,7 +17,7 @@ const ROOT = fileURLToPath(new URL('.', import.meta.url));
 const read = rel => readFileSync(join(ROOT, rel), 'utf8');
 const fail = m => { console.error('\nBUILD FAILED: ' + m + '\n'); process.exit(1) };
 
-const ORDER = ['config', 'state', 'utils', 'markdown', 'catalog', 'keys', 'rotation', 'models', 'attachments', 'search', 'chats', 'messages', 'api', 'streaming', 'extras', 'modals', 'events', 'app'];
+const ORDER = ['config', 'state', 'utils', 'markdown', 'catalog', 'keys', 'rotation', 'models', 'attachments', 'idb', 'search', 'chats', 'messages', 'api', 'streaming', 'extras', 'modals', 'events', 'app', 'pwa'];
 
 const css = read('css/app.css');
 const markedSrc = read('js/vendor/marked.umd.js');
