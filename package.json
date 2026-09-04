@@ -1,10 +1,12 @@
 {
   "name": "the-playground",
-  "version": "2.9.4",
+  "version": "3.0.0",
   "private": true,
-  "description": "Multi-provider AI studio — single-file artifact built from modular source",
+  "description": "Multi-provider AI studio \u2014 single-file artifact built from modular source",
   "scripts": {
     "build": "node build.mjs",
-    "dev": "python -m http.server 8000"
+    "dev": "python3 -m http.server 8000",
+    "test": "node tests/run.js",
+    "audit:models": "node tests/audit-models.js"
   }
 }
