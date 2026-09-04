@@ -30,9 +30,10 @@ function applyCatalog(list) {
       apiId: mo.id,
       isFree: mo.free,
       intel: mo.free ? 3 : 4,
-      ctx: fmtCtx(mo.ctx),
+      ctx: fmtCtx(mo.ctx || (r.local ? 8192 : 0)),
       vision: mo.vision,
       live: true,
+      pricing: mo.pricing,
       desc:
         (mo.desc || "").replace(/\s+/g, " ").trim().slice(0, 150) ||
         "Live entry from the OpenRouter catalog.",
@@ -119,6 +120,7 @@ async function refreshCatalog(force) {
           []
         ).includes("image"),
         desc: x.description || "",
+        pricing: x.pricing || null,
       }))
       .filter((m) => m.id);
     if (!models.length) throw new Error("empty catalog");
@@ -202,7 +204,7 @@ function applyNativeCatalog(pid, list) {
       apiId: mo.id,
       isFree: r.type === "free" && mo.free !== false,
       intel: 3,
-      ctx: fmtCtx(mo.ctx),
+      ctx: fmtCtx(mo.ctx || (r.local ? 8192 : 0)),
       vision: !!mo.vision,
       live: true,
       native: true,
@@ -241,7 +243,7 @@ async function refreshNativeCatalogs() {
       return;
     }
     const key = getKey(pid);
-    if (!key) return;
+    if (!key && !r.local) return;
     const ac = new AbortController();
     const to = setTimeout(() => ac.abort(), 8000);
     try {
@@ -249,7 +251,7 @@ async function refreshNativeCatalogs() {
       if (pid === "anthropic") {
         headers["x-api-key"] = key;
         headers["anthropic-version"] = "2023-06-01";
-      } else headers["Authorization"] = "Bearer " + key;
+      } else if (!r.local) headers["Authorization"] = "Bearer " + key;
       const res = await fetch(r.models, { headers, signal: ac.signal });
       if (!res.ok) return;
       const data = await res.json();

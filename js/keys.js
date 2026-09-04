@@ -18,9 +18,12 @@ const KEY_DEFS = [
   ["sambanova", "SambaNova", "…"],
 ];
 function buildKeyInputs() {
+  const local = Object.keys(REG).filter((p) => REG[p].local);
   $("freeKeys").innerHTML = KEY_DEFS.filter((d) => REG[d[0]].type === "free")
     .map((d) => keyRow(d[0], d[1], d[2]))
     .join("");
+  $("freeKeys").insertAdjacentHTML("beforeend", local.map((p) => `<div class="sb-key"><span class="sb-key-label" id="local_${p}">${REG[p].name} — checking…</span></div>`).join(""));
+  refreshLocalStatus();
   $("paidKeys").innerHTML = KEY_DEFS.filter((d) => REG[d[0]].type === "paid")
     .map((d) => keyRow(d[0], d[1], d[2]))
     .join("");
@@ -159,3 +162,5 @@ function refreshKeyUI() {
   $("freeKeyCount").textContent = `${f} key${f !== 1 ? "s" : ""} set`;
   $("paidKeyCount").textContent = `${p} key${p !== 1 ? "s" : ""} set`;
 }
+
+async function refreshLocalStatus() { for (const pid of Object.keys(REG).filter((p)=>REG[p].local)) { const el=$("local_"+pid); try { const r=await fetch(REG[pid].models); if(el) el.textContent=REG[pid].name+" — "+(r.ok?"reachable":"not reachable"); } catch { if(el) el.textContent=REG[pid].name+" — not reachable"; } } }

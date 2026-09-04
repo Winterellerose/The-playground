@@ -67,26 +67,26 @@ function getCfg(excludedPids = []) {
     if (
       !excluded.has(pid) &&
       !cands.includes(pid) &&
-      getKey(pid) &&
+      (REG[pid].local || getKey(pid)) &&
       avail(pid) &&
       canServe(pid, m)
     )
       cands.push(pid);
   };
   push(m.provider);
-  OR_STYLE.forEach(push); // same exact id via OpenRouter
-  pool.forEach(push); // provider-native fallback models
-  [...PAID_PIDS, ...FREE_PIDS].forEach(push); // last resort
+  if (!REG[m.provider].local) OR_STYLE.forEach(push); // same exact id via OpenRouter
+  if (!REG[m.provider].local) pool.forEach(push); // provider-native fallback models
+  if (!REG[m.provider].local) [...PAID_PIDS, ...FREE_PIDS].filter((p) => !REG[p].local).forEach(push); // last resort
   if (!cands.length) {
     // There ARE providers for this model, but every key is missing/bad/limited.
-    const haveKey = KEY_DEFS.some(([pid]) => getKey(pid));
+    const haveKey = KEY_DEFS.some(([pid]) => getKey(pid)) || Object.values(REG).some((r) => r.local);
     if (!haveKey)
       return {
         error:
           "No API keys configured. Open Settings and add at least one free key (OpenRouter recommended).",
       };
     const canHost = Object.keys(REG).filter((p) => canServe(p, m));
-    const missing = canHost.filter((p) => !getKey(p));
+    const missing = canHost.filter((p) => !REG[p].local && !getKey(p));
     if (missing.length)
       return {
         error: `"${m.name}" needs ${missing.map((p) => REG[p].name).join(" or ")} — add that key in Settings, or pick a model you have a key for.`,
@@ -106,7 +106,7 @@ function getCfg(excludedPids = []) {
     model: m,
     pid,
     modelId: idFor(pid, m),
-    apiKey: getKey(pid),
+    apiKey: REG[pid].local ? "" : getKey(pid),
     thinking: $("thinkingToggle").classList.contains("on"),
     effort: $("effortSelect").value,
     temp: parseFloat($("tempSelect").value),
