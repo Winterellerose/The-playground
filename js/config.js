@@ -483,6 +483,19 @@ const MODELS = {
     desc: "Google multimodal Gemma 4 31B, free via OpenRouter.",
   },
   /* ── Gemini (Flash = free via AI Studio; Pro = PAID only since Apr 2026) ── */
+  g38f: {
+    name: "Gemini 3.8 Flash",
+    badge: "GEM 3.8",
+    group: "free", // regroupModels() lands it in the 🆓 Free bucket regardless
+    provider: "gemini", // direct Google AI Studio (AQ… key) — never touches OpenRouter credits
+    apiId: "gemini-3.8-flash",
+    isFree: true, // green FREE pill
+    intel: 5,
+    ctx: "1M",
+    vision: true,
+    thinking: true,
+    desc: "Google frontier workhorse. Free via Google AI Studio.",
+  },
   g36f: {
     name: "Gemini 3.6 Flash",
     badge: "GEM 3.6",
