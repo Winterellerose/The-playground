@@ -21,12 +21,13 @@ const ACT = {
   "clear-chat-prompt": () => clearChatPrompt(),
   "save-chat-prompt": () => saveChatPrompt(),
   "export-chats": () => exportChats(),
+  "export-md": () => exportCurrentChatAsMarkdown(),
+  "copy-transcript": () => copyFullTranscript(),
   "import-chats": () => $("importFile").click(),
   "clear-chat": () => clearChat(),
   "attach": () => attachClick(),
   "test-key": (b) => testKey(b.dataset.pid),
   "jump-latest": () => jumpToLatest(),
-  
   "voice": () => toggleVoice(),
 };
 
@@ -39,7 +40,6 @@ function bindScrollTracking() {
 /* Named handlers extracted from listeners that used to be bound inline
    next to each feature. */
 function mpBodyClick(e) {
-  // Ordered: × remove custom → Add → section toggle → card select.
   const rc = e.target.closest('[data-act="remove-custom"]');
   if (rc) {
     removeCustom(rc.dataset.id, e);
@@ -57,28 +57,33 @@ function mpBodyClick(e) {
   const c = e.target.closest(".mp-card");
   if (c && c.dataset.mid) selectModel(c.dataset.mid, true);
 }
+
 function sbListClick(e) {
   const item = e.target.closest && e.target.closest(".sb-item");
   if (!item) return;
   if (e.target.closest(".sb-del")) deleteChat(item.dataset.cid);
   else loadChat(item.dataset.cid);
 }
+
 function sbListDblClick(e) {
   const item = e.target.closest && e.target.closest(".sb-item");
   if (item && !e.target.closest(".sb-del")) renameChat(item.dataset.cid);
 }
+
 function autoResizeInput() {
   userInput.style.height = "auto";
   userInput.style.height = Math.min(userInput.scrollHeight, 300) + "px";
 }
 
 function bindEvents() {
+  // Global delegated click listener handles all [data-act] buttons (including #scrollJump)
   document.body.addEventListener("click", (e) => {
     const b = e.target.closest("[data-act]");
     if (!b) return;
     const fn = ACT[b.dataset.act];
     if (fn) fn(b);
   });
+
   // Modal panels swallow the backdrop-close click — but action buttons INSIDE
   // the panel must still bubble to the delegation.
   document.querySelectorAll(".mp-modal,.st-modal").forEach((m) =>
@@ -88,41 +93,51 @@ function bindEvents() {
       e.stopPropagation();
     }),
   );
+
   // Landing + global keys (defined in app.js / modals.js).
   $("landing").addEventListener("click", dismissLanding);
   document.addEventListener("keydown", onGlobalKeydown);
   document.addEventListener("keydown", onSyntheticActivate);
-  // Static form controls.
+
+  // Static form controls & setting persistence
   $("sbSearch").addEventListener("input", renderSidebar);
   $("sysPrompt").addEventListener("change", saveAll);
   $("extrasMode").addEventListener("change", saveAll);
+  $("effortSelect").addEventListener("change", saveAll);
+  $("tempSelect").addEventListener("change", saveAll);
+  $("maxTok").addEventListener("change", saveAll);
+
   $("searchProvider").addEventListener("change", () => {
     saveSearchCfg();
     renderSearchFields();
   });
+
   $("importFile").addEventListener("change", (e) => {
     importChats(e.target);
   });
+
   bindScrollTracking();
-  $("scrollJump").addEventListener("click", () =>
-    ACT["jump-latest"](),
-  );
+
   $("imgFile").addEventListener("change", (e) => {
     addAttachFiles(e.target.files);
     e.target.value = "";
   });
+
   userInput.addEventListener("input", autoResizeInput);
   userInput.addEventListener("keydown", handleKey);
+
   // Send/Stop is state-driven — one listener, no swapping.
   sendBtn.addEventListener("click", () =>
     isStreaming ? stopStream() : sendMessage(),
   );
+
   // Welcome suggestions carry their prompt in data-suggest.
   welcome
     .querySelectorAll(".suggest-btn")
     .forEach((b) =>
       b.addEventListener("click", () => suggest(b.dataset.suggest)),
     );
+
   // API key rows: input events delegate at the section containers.
   ["freeKeys", "paidKeys"].forEach((id) =>
     $(id).addEventListener("input", (e) => {
@@ -130,14 +145,17 @@ function bindEvents() {
       if (pid) onKeyEdit(pid);
     }),
   );
+
   // Model picker: clicks + live search (input field is re-created per render).
   $("mpBody").addEventListener("click", mpBodyClick);
   $("mpBody").addEventListener("input", (e) => {
     if (e.target.id === "mpSearch") mpFilter(e.target.value);
   });
+
   // Sidebar conversation list.
   $("sbList").addEventListener("click", sbListClick);
   $("sbList").addEventListener("dblclick", sbListDblClick);
+
   // Staged attachments: remove buttons carry their index.
   $("previewStrip").addEventListener("click", (e) => {
     const b = e.target.closest("[data-act]");
@@ -145,6 +163,7 @@ function bindEvents() {
     if (b.dataset.act === "remove-image") removeImage(+b.dataset.i);
     else if (b.dataset.act === "remove-file") removeFile(+b.dataset.i);
   });
+
   // Chat surface: follow-up chips first, then data-act buttons, then the
   // thinking disclosure — ordered with early returns so one click = one action.
   chatWrap.addEventListener("click", (e) => {
@@ -182,6 +201,7 @@ function bindEvents() {
         return submitEdit(idx);
     }
   });
+
   // Ctrl/Cmd+Enter submits an in-place message edit.
   chatWrap.addEventListener("keydown", (e) => {
     if (!e.target.classList || !e.target.classList.contains("edit-ta")) return;

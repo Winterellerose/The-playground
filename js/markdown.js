@@ -162,7 +162,7 @@ function splitOpenFence(src) {
   const lines = String(src).split("\n");
   let open = null;
   for (let i = 0; i < lines.length; i++) {
-    const m = /^ {0,3}(`{3,})([^`]*)$/.exec(lines[i]);
+    const m = /^ {0,3}(`{3,}|~{3,})([^`~]*)$/.exec(lines[i]);
     if (!m) continue;
     if (open) {
       if (m[1].length >= open.ticks && !m[2].trim()) open = null;
@@ -252,14 +252,45 @@ function renderMd(src, streaming) {
 }
 function copyCode(btn) {
   const code = btn.closest(".code-block").querySelector("code").textContent;
-  navigator.clipboard.writeText(code);
-  const s = btn.querySelector("span");
-  s.textContent = "Copied";
-  btn.classList.add("copied");
-  setTimeout(() => {
-    s.textContent = "Copy";
-    btn.classList.remove("copied");
-  }, 1400);
+  const showCopied = () => {
+    const s = btn.querySelector("span");
+    s.textContent = "Copied";
+    btn.classList.add("copied");
+    setTimeout(() => {
+      s.textContent = "Copy";
+      btn.classList.remove("copied");
+    }, 1400);
+  };
+  if (window.isSecureContext && navigator.clipboard) {
+    navigator.clipboard.writeText(code).then(showCopied).catch(() => {
+      // fallback if clipboard write fails
+      const ta = document.createElement("textarea");
+      ta.value = code;
+      ta.style.position = "fixed";
+      ta.style.opacity = "0";
+      document.body.appendChild(ta);
+      ta.focus();
+      ta.select();
+      try {
+        document.execCommand("copy");
+        showCopied();
+      } catch {}
+      ta.remove();
+    });
+  } else {
+    const ta = document.createElement("textarea");
+    ta.value = code;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    try {
+      document.execCommand("copy");
+      showCopied();
+    } catch {}
+    ta.remove();
+  }
 }
 function highlight(el) {
   el.querySelectorAll(".code-block pre code").forEach((c) => {
@@ -292,7 +323,7 @@ function syncScrollPinned() {
   const st = scrollArea.scrollTop;
   if (performance.now() >= scrollJumpGuard) {
     const dir = st - lastScrollTop;
-    if (dir < -2) scrollPinned = false; // user scrolled up → pause the chase
+    if (dir < -2 && !nearScrollBottom()) scrollPinned = false; // user scrolled up → pause the chase (ignore rubber-band bounce at bottom)
     else if (dir > 2 || nearScrollBottom())
       scrollPinned = nearScrollBottom(); // moving down or idle → pin iff at bottom
     // dir ≈ 0 (content resized under us) → keep current state
@@ -304,7 +335,7 @@ function syncScrollPinned() {
 function scrollToBottom() {
   if (!scrollPinned || !scrollArea) return; // reader is rereading — don't yank
   scrollJumpGuard = performance.now() + 300;
-  scrollArea.scrollTo({ top: scrollArea.scrollHeight, behavior: "instant" });
+  scrollArea.scrollTop = scrollArea.scrollHeight;
 }
 function jumpToLatest() {
   scrollPinned = true;
@@ -313,7 +344,7 @@ function jumpToLatest() {
   if (!scrollArea) return;
   scrollJumpGuard = performance.now() + 300;
   lastScrollTop = scrollArea.scrollHeight;
-  scrollArea.scrollTo({ top: scrollArea.scrollHeight, behavior: "instant" });
+  scrollArea.scrollTop = scrollArea.scrollHeight;
 }
 function resetScrollPin() {
   scrollPinned = true;

@@ -9,12 +9,15 @@
 function webNeedsSearch(q) {
   const t = String(q || "").toLowerCase();
   if (t.length < 4) return false;
-  const year = new Date().getFullYear();
+  const y = new Date().getFullYear();
+  const recentYears = new RegExp(
+    `\\b(${y - 3}|${y - 2}|${y - 1}|${y}|${y + 1})\\b`,
+  );
   return (
     /\b(latest|recent(ly)?|current(ly)?|today|tonight|right now|as of|news|update[d]?|this (year|week|month)|last (night|week|month|year)|next (week|month|year)|price[sd]?|cost|release[d]?|launch(ed)?|version|score[sd]?|result[s]?|who won|election|weather|forecast|stock|standings|schedule|obituary|died|breaking)\b/.test(
       t,
     ) ||
-    new RegExp("\\b(20[0-9]{2}|" + year + ")\\b").test(t) ||
+    recentYears.test(t) ||
     /\b(how (old|tall|much|many)|when (is|was|did|does)|where (is|was|are)|what(?:'s| is| are) (the |a )?(new|latest|current|next|today))\b/.test(
       t,
     )

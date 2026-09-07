@@ -47,9 +47,10 @@ function markOk(pid) {
 }
 const OR_STYLE = ["openrouter", "openrouter_paid"];
 const OR_HOSTABLE = /^[a-z0-9~-][a-z0-9._~-]*\/[a-z0-9._~-]+$/i;
-function canServe(pid, m) {
+function canServe(pid, m, allowFallback = false) {
   if (pid === m.provider) return true;
   if (OR_STYLE.includes(pid) && OR_HOSTABLE.test(m.apiId)) return true;
+  if (allowFallback && FALLBACK_ID[pid]) return true;
   return false;
 }
 function idFor(pid, m) {
@@ -63,29 +64,29 @@ function getCfg(excludedPids = []) {
   const pool = REG[m.provider].type === "free" ? FREE_PIDS : PAID_PIDS;
   const excluded = new Set(excludedPids || []);
   let cands = [];
-  const push = (pid) => {
+  const push = (pid, allowFallback = false) => {
     if (
       !excluded.has(pid) &&
       !cands.includes(pid) &&
       (REG[pid].local || getKey(pid)) &&
       avail(pid) &&
-      canServe(pid, m)
+      canServe(pid, m, allowFallback)
     )
       cands.push(pid);
   };
-  push(m.provider);
-  if (!REG[m.provider].local) OR_STYLE.forEach(push); // same exact id via OpenRouter
-  if (!REG[m.provider].local) pool.forEach(push); // provider-native fallback models
-  if (!REG[m.provider].local) [...PAID_PIDS, ...FREE_PIDS].filter((p) => !REG[p].local).forEach(push); // last resort
+
+  push(m.provider, false);
+  if (!REG[m.provider].local) OR_STYLE.forEach((p) => push(p, false));
+  if (!REG[m.provider].local) pool.forEach((p) => push(p, true));
+  if (!REG[m.provider].local) [...PAID_PIDS, ...FREE_PIDS].filter((p) => !REG[p].local).forEach((p) => push(p, true));
+
   if (!cands.length) {
-    // There ARE providers for this model, but every key is missing/bad/limited.
     const haveKey = KEY_DEFS.some(([pid]) => getKey(pid)) || Object.values(REG).some((r) => r.local);
     if (!haveKey)
       return {
-        error:
-          "No API keys configured. Open Settings and add at least one free key (OpenRouter recommended).",
+        error: "No API keys configured. Open Settings and add at least one free key (OpenRouter recommended).",
       };
-    const canHost = Object.keys(REG).filter((p) => canServe(p, m));
+    const canHost = Object.keys(REG).filter((p) => canServe(p, m, true));
     const missing = canHost.filter((p) => !REG[p].local && !getKey(p));
     if (missing.length)
       return {
@@ -95,13 +96,14 @@ function getCfg(excludedPids = []) {
       error: `All providers for "${m.name}" are rate-limited or rejected the request. Free tiers can be busy — wait a moment, pick another free model, or add a paid key.`,
     };
   }
-  const pid = cands[0],
-    prov = REG[pid];
+
+  const pid = cands[0], prov = REG[pid];
   if (pid !== m.provider)
     logRot(
       `Routing ${m.badge || m.apiId} via ${prov.name} → ${idFor(pid, m)}`,
       prov.type === "free" ? "ok" : "warn",
     );
+
   return {
     model: m,
     pid,

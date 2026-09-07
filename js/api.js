@@ -1,6 +1,15 @@
 "use strict";
 /* ═══ api.js — provider request builders + history mapping ═══ */
 
+function parseCtxTokens(raw) {
+  const s = String(raw || "").trim();
+  const n = parseFloat(s);
+  if (isNaN(n)) return 0;
+  if (/m/i.test(s)) return Math.round(n * 1e6);
+  if (/k/i.test(s)) return Math.round(n * 1e3);
+  return Math.round(n);
+}
+
 /* ── Request builders ── */
 function mapEffort(e, pid) {
   if (pid === "deepseek")
@@ -44,10 +53,12 @@ function buildRequest(cfg, hist) {
     if (m.adaptive) {
       /* adaptive models manage thinking themselves; no temp */
     } else if (cfg.thinking && m.thinking === true) {
+      const budget = Math.min(10240, Math.max(2048, cfg.maxTok - 2048));
       rb.thinking = {
         type: "enabled",
-        budget_tokens: Math.min(10240, Math.max(2048, cfg.maxTok - 2048)),
+        budget_tokens: budget,
       };
+      if (cfg.maxTok <= budget) rb.max_tokens = budget + 1024;
     } else rb.temperature = cfg.temp;
     return { h, rb };
   }
@@ -77,7 +88,11 @@ function wireHist(hist, cfg) {
       x.role === "user" ? userContentWithFiles(x.content, x.files) : x.content;
     const imgs =
       useImg && x.role === "user" && x.images && x.images.length
-        ? x.images.slice(0, MAX_IMGS)
+        ? x.images
+            .filter(
+              (u) => typeof u === "string" && u.startsWith("data:image/"),
+            )
+            .slice(0, MAX_IMGS)
         : [];
     if (!imgs.length) return { role: x.role, content: text };
     if (st === "anthropic")
@@ -95,7 +110,7 @@ function wireHist(hist, cfg) {
               },
             };
           }),
-          { type: "text", text: text },
+          ...(text.trim() ? [{ type: "text", text: text }] : []),
         ],
       };
     return {
@@ -109,7 +124,8 @@ function wireHist(hist, cfg) {
 }
 function cleanHistory(c, targetIdx) {
   let h = c.messages.slice(0, targetIdx).filter((x) => (x.role === "user" && ((x.content||"").trim() || (x.images&&x.images.length) || (x.files&&x.files.length))) || (x.role === "assistant" && ((x.content||"").trim() || (x.thinking||"").trim())));
-  const model = MODELS[c.model || selectedModel] || {}, raw = String(model.ctx || ""), ctx = Number(raw.replace(/[^0-9]/g, "")) * (/k/i.test(raw) ? 1000 : 1);
+  const model = MODELS[c.model || selectedModel] || {},
+    ctx = parseCtxTokens(model.ctx);
   if (!ctx) h = h.slice(-60); else { const max=Math.max(1,(ctx-(parseInt($("maxTok").value)||8192))*.95); const tok=()=>h.reduce((n,x)=>n+Math.ceil(((x.content||"")+(x.thinking||"")).length/4),0); while(h.length>1 && tok()>max) h.shift(); if(h[0] && h[0].role === "assistant") h.shift(); }
   return h.map((x) => { const o={role:x.role,content:x.content||""}; if(x.role === "user" && x.images) o.images=x.images; if(x.role === "user" && x.files) o.files=x.files; return o; });
 }

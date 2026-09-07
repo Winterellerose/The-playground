@@ -16,7 +16,7 @@ function metaCandidates(m, mode = getExtrasMode()) {
     if (
       freeAllowed &&
       !out.includes(pid) &&
-      getKey(pid) &&
+      (REG[pid].local || getKey(pid)) &&
       avail(pid) &&
       canServe(pid, m)
     )
@@ -52,13 +52,14 @@ async function metaChat(messages, m, mode = getExtrasMode()) {
           body.messages = messages.slice(1);
         }
       } else {
-        h.Authorization = "Bearer " + getKey(pid);
+        if (!REG[pid].local) h.Authorization = "Bearer " + getKey(pid);
         if (pid === "openai") {
           body.max_completion_tokens = 280;
           delete body.max_tokens;
         }
         if (REG[pid].hdr) Object.assign(h, REG[pid].hdr());
       }
+      if (m.noTemp) delete body.temperature;
       // Cheap call: never spend reasoning budget.
       if (st === "ds") body.thinking = { type: "disabled" };
       else if (st === "or") body.reasoning = { effort: "low" };
@@ -130,7 +131,7 @@ function parseMetaText(txt) {
       } catch {}
     }
     if (!j) {
-      const m = /\{[\s\S]*"followups"[\s\S]*\}/.exec(txt);
+      const m = /\{[\s\S]*?"followups"[\s\S]*?\}/.exec(txt);
       if (m) {
         try {
           j = JSON.parse(m[0]);

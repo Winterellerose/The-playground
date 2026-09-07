@@ -6,13 +6,22 @@ function esc(s) {
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 function fmtCtx(n) {
   if (!n || n < 1000) return n ? String(n) : "—";
   return n < 1e6
     ? Math.round(n / 1000) + "K"
     : (n / 1e6).toFixed(1).replace(/\.0$/, "") + "M";
+}
+function parseCtxTokens(raw) {
+  const s = String(raw || "").trim();
+  const n = parseFloat(s);
+  if (isNaN(n)) return 0;
+  if (/m/i.test(s)) return Math.round(n * 1e6);
+  if (/k/i.test(s)) return Math.round(n * 1e3);
+  return Math.round(n);
 }
 function fmtFileSize(n) {
   n = Number(n) || 0;
@@ -207,10 +216,7 @@ const MAX_IMAGE_DATA_URL = 5 * 1024 * 1024;
 function safeImageDataUrl(value) {
   const s = String(value || "");
   if (!s || s.length > MAX_IMAGE_DATA_URL) return "";
-  const m = /^data:image\/(?:png|jpeg|webp|gif);base64,/i.exec(s);
-  if (!m) return "";
-  const payload = s.slice(m[0].length);
-  return payload && /^[A-Za-z0-9+/=\r\n]+$/.test(payload) ? s : "";
+  return /^data:image\/(?:png|jpeg|webp|gif);base64,[A-Za-z0-9+/=\r\n]+$/i.test(s) ? s : "";
 }
 function safeWebUrl(value) {
   try {

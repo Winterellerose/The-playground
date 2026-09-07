@@ -13,6 +13,7 @@ function loadCustomModels() {
         isFree: REG[cm.provider].type === "free",
         intel: 3,
         ctx: cm.ctx || "—",
+        vision: !!cm.vision,
         desc: "Custom model. " + REG[cm.provider].name + " · " + cm.apiId,
         custom: true,
       };
@@ -108,11 +109,19 @@ function addCustomModel() {
   const v = customModelVerify(prov, idRaw);
   if (v && v.err) return logRot("Custom model: " + v.err, "err");
   const id = "custom_" + Date.now();
+  let matched = null;
+  try {
+    const c = JSON.parse(localStorage.getItem(OR_CAT_KEY) || "null");
+    if (c && Array.isArray(c.models))
+      matched = c.models.find((m) => m.id === idRaw);
+  } catch {}
   customModels.push({
     id,
     provider: prov,
     apiId: idRaw,
     name: idRaw.split("/").pop().slice(0, 24),
+    ctx: matched?.ctx ? fmtCtx(matched.ctx) : "—",
+    vision: !!matched?.vision,
   });
   loadCustomModels();
   saveCustomModels(); // register first, THEN persist — the old order dropped the newest add
@@ -301,9 +310,24 @@ function toggleThinking() {
   t.classList.toggle("on");
   syncToggle(t);
 }
+function parseCtxTokens(raw) {
+  const s = String(raw || "").trim();
+  const n = parseFloat(s);
+  if (isNaN(n)) return 0;
+  if (/m/i.test(s)) return Math.round(n * 1e6);
+  if (/k/i.test(s)) return Math.round(n * 1e3);
+  return Math.round(n);
+}
 function updateUsageMeter() {
-  const c=getActiveChat(), m=MODELS[selectedModel]||{}, ctx=Number(String(m.ctx||'').replace(/[^0-9]/g,''))*(/k/i.test(String(m.ctx||''))?1000:1);
-  const used=(c?.messages||[]).reduce((n,x)=>n+(x.meta&&Number(x.meta.in)+Number(x.meta.out)||Math.ceil(String(x.content||'').length/4)),0);
-  const cost=(c?.messages||[]).reduce((n,x)=>n+(x.meta&&REG[x.meta.p]&&REG[x.meta.p].metered ? 0 : 0),0);
-  const el=$("frameMeta"); if(el) el.textContent="— "+REG[m.provider]?.name?.toUpperCase()+" · "+m.badge?.toUpperCase()+" · "+(ctx?Math.round(used/1000)+"k / "+Math.round(ctx/1000)+"k":"est. —")+(REG[m.provider]?.type === "free" || REG[m.provider]?.local ? " · free" : " · est. cost");
+  const c = getActiveChat(),
+    m = MODELS[selectedModel] || {},
+    ctx = parseCtxTokens(m.ctx);
+  const used = (c?.messages || []).reduce(
+    (n, x) =>
+      n +
+      ((x.meta && Number(x.meta.in) + Number(x.meta.out)) ||
+        Math.ceil(String(x.content || "").length / 4)),
+    0,
+  );
+  const el = $("frameMeta"); if(el) el.textContent="— "+REG[m.provider]?.name?.toUpperCase()+" · "+m.badge?.toUpperCase()+" · "+(ctx?Math.round(used/1000)+"k / "+Math.round(ctx/1000)+"k":"est. —")+(REG[m.provider]?.type === "free" || REG[m.provider]?.local ? " · free" : " · est. cost");
 }

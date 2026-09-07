@@ -12,7 +12,11 @@ function openModalNow() {
   );
 }
 function focusablesWithin(root) {
-  return root ? [...root.querySelectorAll(FOCUSABLE)] : [];
+  return root
+    ? [...root.querySelectorAll(FOCUSABLE)].filter(
+        (el) => el.offsetWidth > 0 || el.offsetHeight > 0 || el.getClientRects().length > 0,
+      )
+    : [];
 }
 function rememberFocus(el) {
   lastFocus = el || document.activeElement || null;
@@ -47,8 +51,9 @@ function closeModalOverlay(id) {
   restoreFocus();
 }
 function openModelPicker() {
+  const trigger = document.activeElement;
   renderModelPicker();
-  openModalOverlay("mpOverlay");
+  openModalOverlay("mpOverlay", trigger);
   setTimeout(() => {
     const s = $("mpBody").querySelector(".mp-card.selected");
     if (s) s.scrollIntoView({ block: "center", behavior: "smooth" });
@@ -93,7 +98,7 @@ function onGlobalKeydown(e) {
     return;
   }
   const typing = /INPUT|TEXTAREA|SELECT/.test((e.target && e.target.tagName) || "");
-  if (!typing && !openModalNow() && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); openModelPicker(); return; }
+  if (!openModalNow() && (e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") { e.preventDefault(); openModelPicker(); return; }
   if (!typing && !openModalNow() && (e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === "o") { e.preventDefault(); newChat(); return; }
   const ov = openModalNow();
   if (e.key === "Escape" && ov) {
@@ -113,7 +118,8 @@ function onGlobalKeydown(e) {
     const first = f[0],
       last = f[f.length - 1],
       active = document.activeElement;
-    if (e.shiftKey && (active === first || !ov.contains(active))) {
+    const m = ov.querySelector(".mp-modal,.st-modal");
+    if (e.shiftKey && (active === first || active === m || !ov.contains(active))) {
       e.preventDefault();
       last.focus();
     } else if (!e.shiftKey && (active === last || !ov.contains(active))) {

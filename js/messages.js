@@ -70,12 +70,24 @@ function addAssistantMsg(msg, idx) {
 }
 function copyMsg(btn) {
   const b = btn.closest(".msg").querySelector(".msg-body");
-  navigator.clipboard.writeText(b.dataset.raw || b.innerText);
+  const text = b.dataset.raw || b.innerText;
+  if (window.isSecureContext && navigator.clipboard) {
+    navigator.clipboard.writeText(text);
+  } else {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand("copy"); } catch {}
+    ta.remove();
+  }
   const t = btn.parentElement.querySelector(".copied-toast");
   t.classList.add("show");
   setTimeout(() => t.classList.remove("show"), 1200);
 }
-function switchAlt(idx, dir) {
+async function switchAlt(idx, dir) {
   const c = getActiveChat();
   if (!c) return;
   const m = c.messages[idx];
@@ -88,7 +100,7 @@ function switchAlt(idx, dir) {
   m.thinking = m.alts[ai].thinking;
   m.meta = m.alts[ai].meta;
   m.sources = m.alts[ai].sources;
-  saveChats();
+  await saveChats();
   reloadUI();
 }
 function reloadUI() {
@@ -118,7 +130,7 @@ function editUserMsg(idx) {
   ta.focus();
   ta.setSelectionRange(ta.value.length, ta.value.length);
 }
-function submitEdit(idx) {
+async function submitEdit(idx) {
   const c = getActiveChat();
   if (!c) return;
   const ta = chatWrap.querySelector(`.msg[data-idx="${idx}"] .edit-ta`);
@@ -135,7 +147,7 @@ function submitEdit(idx) {
     files: keepFiles,
   });
   c.updatedAt = Date.now();
-  saveChats();
+  await saveChats();
   reloadUI();
   runCompletion(c);
 }
@@ -146,7 +158,7 @@ function regenerate(idx) {
   if (!m || m.role !== "assistant") return;
   stopStream();
   removeFrom(idx);
-  resetScrollPin(); // a fresh answer the user asked for → re-engage auto-scroll
+  resetScrollPin();
   runCompletion(c, idx);
 }
 function removeFrom(idx) {

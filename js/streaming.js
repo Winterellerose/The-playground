@@ -2,10 +2,68 @@
 /* ═══ streaming.js — input handling, streaming core, send/run ═══ */
 
 /* ── Input ── */
-let voiceRec=null, voiceOn=false, historyPos=-1;
-function toggleVoice() { const R=window.SpeechRecognition||window.webkitSpeechRecognition; if(!R) return; if(voiceOn) return voiceRec.stop(); voiceRec=new R(); voiceRec.lang=navigator.language; voiceRec.interimResults=true; let base=userInput.value; voiceRec.onresult=(e)=>{ let t=""; for(let i=e.resultIndex;i<e.results.length;i++) t+=e.results[i][0].transcript; userInput.value=(base && !/\s$/.test(base)?base+" ":base)+t; autoResizeInput(); }; voiceRec.onend=()=>{voiceOn=false; $("micBtn").classList.remove("on")}; voiceRec.onerror=()=>{logRot("Voice input failed", "warn"); voiceOn=false; $("micBtn").classList.remove("on")}; voiceOn=true; $("micBtn").classList.add("on"); voiceRec.start(); }
+let voiceRec = null,
+  voiceOn = false,
+  historyPos = -1,
+  draftText = "";
+function toggleVoice() {
+  const R = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!R) return;
+  if (voiceOn) return voiceRec.stop();
+  voiceRec = new R();
+  voiceRec.lang = navigator.language;
+  voiceRec.interimResults = true;
+  let base = userInput.value;
+  let finalTranscript = "";
+  voiceRec.onresult = (e) => {
+    let interim = "";
+    for (let i = e.resultIndex; i < e.results.length; i++) {
+      const res = e.results[i];
+      if (res.isFinal) finalTranscript += res[0].transcript;
+      else interim += res[0].transcript;
+    }
+    userInput.value =
+      (base && !/\s$/.test(base) ? base + " " : base) +
+      finalTranscript +
+      interim;
+    autoResizeInput();
+  };
+  voiceRec.onend = () => {
+    voiceOn = false;
+    $("micBtn").classList.remove("on");
+  };
+  voiceRec.onerror = () => {
+    logRot("Voice input failed", "warn");
+    voiceOn = false;
+    $("micBtn").classList.remove("on");
+  };
+  voiceOn = true;
+  $("micBtn").classList.add("on");
+  voiceRec.start();
+}
 function handleKey(e) {
-  if ((e.key === "ArrowUp" || e.key === "ArrowDown") && (!userInput.value || userInput.selectionStart === 0)) { const a=(getActiveChat()?.messages||[]).filter(x=>x.role === "user"); if(a.length) { e.preventDefault(); historyPos=e.key === "ArrowUp" ? Math.max(0,historyPos < 0 ? a.length-1 : historyPos-1) : Math.min(a.length,historyPos+1); userInput.value=historyPos<a.length?(a[historyPos].content||""):""; autoResizeInput(); } return; }
+  if (
+    (e.key === "ArrowUp" || e.key === "ArrowDown") &&
+    (!userInput.value || userInput.selectionStart === 0)
+  ) {
+    const a = (getActiveChat()?.messages || []).filter(
+      (x) => x.role === "user",
+    );
+    if (a.length) {
+      e.preventDefault();
+      if (e.key === "ArrowUp" && historyPos < 0) draftText = userInput.value;
+      historyPos =
+        e.key === "ArrowUp"
+          ? Math.max(0, historyPos < 0 ? a.length - 1 : historyPos - 1)
+          : Math.min(a.length, historyPos + 1);
+      if (historyPos >= a.length) userInput.value = draftText;
+      else
+        userInput.value =
+          historyPos < a.length ? a[historyPos].content || "" : "";
+      autoResizeInput();
+    }
+    return;
+  }
   if (e.key === "Tab") {
     e.preventDefault();
     const s = userInput.selectionStart,
@@ -213,6 +271,14 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
           meta = meta || {};
           meta.out = evt.usage.output_tokens ?? meta.out;
         }
+        if (
+          evt.type === "message_start" &&
+          evt.message &&
+          evt.message.usage
+        ) {
+          meta = meta || {};
+          meta.in = evt.message.usage.input_tokens ?? meta.in;
+        }
         let rc = null,
           txt = null;
         if (evt.type === "content_block_delta" && evt.delta) {
@@ -259,15 +325,19 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
             pulse = null;
           }
           full += txt;
-          const tHead = body.querySelector(".thinking-block")
-            ? body.querySelector(".thinking-block").outerHTML
-            : "";
-          body.innerHTML = tHead + renderMd(full, true);
-          body.classList.add("streaming-cursor");
+          let contentDiv = body.querySelector(".msg-content");
+          if (!contentDiv) {
+            contentDiv = document.createElement("div");
+            contentDiv.className = "msg-content";
+            body.appendChild(contentDiv);
+          }
+          contentDiv.innerHTML = renderMd(full, true);
+          contentDiv.dataset.raw = full;
           body.dataset.raw = full;
+          body.classList.add("streaming-cursor");
           const now = performance.now();
           if (now - lastHl > 800) {
-            highlight(body);
+            highlight(contentDiv);
             lastHl = now;
           }
           scrollToBottom();
@@ -318,12 +388,16 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
     meta.ms = Math.round(ms);
     const outTok = meta.out || Math.round(full.length / 4);
     meta.tps = Math.round(outTok / (ms / 1000));
-    const tHead = body.querySelector(".thinking-block")
-      ? body.querySelector(".thinking-block").outerHTML
-      : "";
-    body.innerHTML = tHead + renderMd(full);
+    let contentDiv = body.querySelector(".msg-content");
+    if (!contentDiv) {
+      contentDiv = document.createElement("div");
+      contentDiv.className = "msg-content";
+      body.appendChild(contentDiv);
+    }
+    contentDiv.innerHTML = renderMd(full);
+    contentDiv.dataset.raw = full;
     body.dataset.raw = full;
-    highlight(body);
+    highlight(contentDiv);
   }
   return {
     content: full,
@@ -347,7 +421,7 @@ async function runCompletion(c, regenIdx) {
   const d = document.createElement("div");
   d.className = "msg assistant";
   d.dataset.idx = idx;
-  d.innerHTML = `<div class="msg-header"><span class="msg-role assistant">AI</span><div class="msg-actions"><span class="copied-toast">Copied</span><button data-act="copy-msg" title="Copy" aria-label="Copy message">${COPY_SVG}</button></div></div><div class="msg-body streaming-cursor"></div>`;
+  d.innerHTML = `<div class="msg-header"><span class="msg-role assistant">AI</span><div class="msg-actions"><span class="copied-toast">Copied</span><button data-act="copy-msg" title="Copy" aria-label="Copy message">${COPY_SVG}</button></div></div><div class="msg-body streaming-cursor"><div class="msg-content"></div></div>`;
   chatWrap.appendChild(d);
   scrollToBottom();
   let result;
@@ -408,7 +482,7 @@ async function runCompletion(c, regenIdx) {
       asstIdx = c.messages.length - 1;
     }
     c.updatedAt = Date.now();
-    const persisted = saveChats();
+    const persisted = await saveChats();
     reloadUI();
     renderSidebar();
     if (!persisted)
@@ -462,7 +536,7 @@ async function sendMessage() {
     files: files.length ? files : undefined,
   });
   c.updatedAt = Date.now();
-  if (!saveChats()) {
+  if (!(await saveChats())) {
     c.messages.pop();
     Object.assign(c, previous);
     showError(

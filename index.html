@@ -112,6 +112,8 @@
         <div class="sb-sect-label">Data</div>
         <div class="sb-actions">
           <button class="btn-sm" data-act="export-chats">Export chats (JSON)</button>
+          <button class="btn-sm" data-act="export-md">Export current as .md</button>
+          <button class="btn-sm" data-act="copy-transcript">Copy transcript</button>
           <button class="btn-sm" data-act="import-chats">Import chats</button>
           <input type="file" id="importFile" accept=".json" style="display:none">
           <button class="btn-sm danger" data-act="clear-chat">Clear chat</button>
@@ -158,6 +160,8 @@
         <div class="dots"><span></span><span></span><span></span></div>
         <span class="frame-title">THE PLAYGROUND</span>
         <span class="frame-meta" id="frameMeta">—</span>
+        <button class="frame-prompt" id="copyTranscriptBtn" data-act="copy-transcript" title="Copy full transcript as Markdown — ready for Slack, Notion, GitHub"><span aria-hidden="true">📋</span>Copy</button>
+        <button class="frame-prompt" id="exportMdBtn" data-act="export-md" title="Export this chat as a clean Markdown file"><span aria-hidden="true">⬇</span>Export .md</button>
         <button class="frame-prompt" id="chatPromptBtn" data-act="open-chat-prompt" title="System prompt for THIS conversation only — layers on top of the global one from Settings"><span aria-hidden="true">📝</span><span id="chatPromptState">Prompt</span></button>
       </div>
       <div class="chat-wrap" id="chatWrap">

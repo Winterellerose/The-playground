@@ -30,7 +30,7 @@ function applyCatalog(list) {
       apiId: mo.id,
       isFree: mo.free,
       intel: mo.free ? 3 : 4,
-      ctx: fmtCtx(mo.ctx || (r.local ? 8192 : 0)),
+      ctx: fmtCtx(mo.ctx || 0),
       vision: mo.vision,
       live: true,
       pricing: mo.pricing,
@@ -166,7 +166,7 @@ function parseNativeModels(pid, data) {
       x.max_context_length ||
       x.context_window ||
       x.context_window_tokens ||
-      0;
+      (pid === "openai" ? 128000 : 0);
     const vision =
       /vision|multimodal|vl\b/i.test(id) ||
       !!(x.capabilities && x.capabilities.vision) ||
@@ -251,6 +251,7 @@ async function refreshNativeCatalogs() {
       if (pid === "anthropic") {
         headers["x-api-key"] = key;
         headers["anthropic-version"] = "2023-06-01";
+        headers["anthropic-dangerous-direct-browser-access"] = "true";
       } else if (!r.local) headers["Authorization"] = "Bearer " + key;
       const res = await fetch(r.models, { headers, signal: ac.signal });
       if (!res.ok) return;

@@ -1,20 +1,71 @@
 "use strict";
-/* ═══ chats.js — chat CRUD, sidebar, per-chat prompts, import/export ═══ */
+/* ═══ chats.js — chat CRUD, sidebar, per-chat prompts, import/export (IndexedDB full migration) ═══ */
 
-/* ── Chats ── */
-function saveChats() {
-  const active=getActiveChat(); if(active) moveLargeImages(active).then(() => { try { localStorage.setItem("chat_history", JSON.stringify(chats)); } catch {} });
+/* ── Chats — now quota-free via IndexedDB ──
+   saveChats() writes to IDB (bulk put). Falls back to localStorage only if IDB unavailable.
+   Migration from localStorage happens in state.js loadChats().
+*/
+async function saveChats() {
+  const active = getActiveChat();
+  if (active) {
+    try {
+      await moveLargeImages(active);
+    } catch {}
+  }
+  // Try IndexedDB first (quota-free)
   try {
-    localStorage.setItem("chat_history", JSON.stringify(chats));
+    if (typeof idbChatsBulkPut === "function") {
+      await idbChatsBulkPut(chats);
+      // Free localStorage copy to avoid quota issues
+      try {
+        localStorage.removeItem("chat_history");
+      } catch {}
+      return true;
+    }
+  } catch (e) {
+    // IDB failed — fall through to localStorage fallback
+    if (typeof logRot === "function") {
+      logRot("IndexedDB save failed — falling back to localStorage", "warn");
+    }
+  }
+  // Fallback: localStorage with filtering (old behavior)
+  const LIMIT = 300 * 1024;
+  const toStorable = (arr) =>
+    arr.map((chat) => ({
+      ...chat,
+      messages: (chat.messages || []).map((msg) => {
+        if (!msg.images || !msg.images.length) return msg;
+        const filtered = msg.images.filter((img) => {
+          if (
+            typeof img === "string" &&
+            img.length > LIMIT &&
+            img.startsWith("data:")
+          )
+            return false;
+          return true;
+        });
+        if (filtered.length === msg.images.length) return msg;
+        return { ...msg, images: filtered };
+      }),
+    }));
+  try {
+    localStorage.setItem("chat_history", JSON.stringify(toStorable(chats)));
     return true;
   } catch (e) {
-    logRot(
-      "Storage full — message was not saved; export & prune old chats",
-      "err",
-    );
+    try {
+      localStorage.setItem("chat_history", JSON.stringify(toStorable(chats)));
+      return true;
+    } catch {}
+    if (typeof logRot === "function") {
+      logRot(
+        "Storage full — message was not saved; export & prune old chats",
+        "err",
+      );
+    }
     return false;
   }
 }
+
 function renderSidebar() {
   if (!document || !$("sbList")) return;
   const q = ($("sbSearch")?.value || "").toLowerCase();
@@ -44,7 +95,7 @@ function renderSidebar() {
           ? '<span class="sb-sp" title="Has its own system prompt">📝</span>'
           : "";
       const ttl = esc(c.title || "New chat");
-      let snippet=""; if(q && !(c.title||"").toLowerCase().includes(q)) { for(const x of c.messages||[]) { const v=String(x.content||""), at=v.toLowerCase().indexOf(q); if(at>=0) { snippet=`<span class="sb-snippet">${esc(v.slice(Math.max(0,at-20),at))}<mark>${esc(v.slice(at,at+q.length))}</mark>${esc(v.slice(at+q.length,at+40))}</span>`; break; } } }
+      let snippet=""; if(q && !(c.title||"").toLowerCase().includes(q)) { for(const x of c.messages||[]) { const v=String(x.content||"").replace(/\s+/g, " "), at=v.toLowerCase().indexOf(q); if(at>=0) { snippet=`<span class="sb-snippet">${esc(v.slice(Math.max(0,at-20),at))}<mark>${esc(v.slice(at,at+q.length))}</mark>${esc(v.slice(at+q.length,at+40))}</span>`; break; } } }
       return `<div class="sb-item${c.id === activeChatId ? " active" : ""}" data-cid="${esc(c.id)}" tabindex="0" role="button" aria-label="Open conversation: ${ttl}"><span class="sb-title">${ttl}</span><span class="sb-meta">${sp}<span class="sb-model-tag">${esc(badge)}</span>${date}${snippet}</span><button class="sb-del" title="Delete" aria-label="Delete conversation: ${ttl}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6m3 0V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></button></div>`;
     })
     .join("");
@@ -62,15 +113,18 @@ function renameChat(id) {
 function newChat() {
   stopStream();
   activeChatId = null;
-  localStorage.removeItem("active_chat_id");
+  try {
+    localStorage.removeItem("active_chat_id");
+  } catch {}
   resetWelcome();
   resetScrollPin();
   renderSidebar();
   syncChatPromptUI();
   closeSidebar();
-  userInput.focus();
+  if (userInput && userInput.focus) userInput.focus();
 }
 function resetWelcome() {
+  if (!chatWrap || !welcome) return;
   chatWrap.innerHTML = "";
   chatWrap.appendChild(welcome);
   welcome.style.display = "flex";
@@ -90,20 +144,31 @@ function ensureChat() {
     };
     chats.push(c);
     activeChatId = c.id;
-    localStorage.setItem("active_chat_id", c.id);
+    try {
+      localStorage.setItem("active_chat_id", c.id);
+    } catch {}
   }
   return getActiveChat();
 }
 // loadChat re-attaches #welcome (hidden) rather than just wiping the wrap: wiping
 // used to detach it, so the next selectModel() threw on the missing #welcomeModel.
-function loadChat(id) {
+async function loadChat(id) {
   stopStream();
   const c = chats.find((x) => x.id === id);
   if (!c) return;
   activeChatId = id;
-  localStorage.setItem("active_chat_id", id);
-  if ((c.messages||[]).some((m)=>(m.images||[]).some(idbRef))) { hydrateImages(c).then(() => loadChat(id)); return; }
+  try {
+    localStorage.setItem("active_chat_id", id);
+  } catch {}
+  if ((c.messages||[]).some((m)=>(m.images||[]).some(idbRef))) {
+    try {
+      await hydrateImages(c);
+    } catch {}
+    // Re-enter after hydration (images now data URLs)
+    return loadChat(id);
+  }
   if (c.model && MODELS[c.model]) selectModel(c.model, false);
+  if (!chatWrap || !welcome) return;
   chatWrap.innerHTML = "";
   chatWrap.appendChild(welcome);
   welcome.style.display = "none";
@@ -118,20 +183,35 @@ function loadChat(id) {
   updateUsageMeter();
   scrollToBottom();
 }
-function deleteChat(id) {
+async function deleteChat(id) {
   stopStream();
+  const chat = chats.find((c) => c.id === id);
+  if (chat) {
+    for (const m of chat.messages || []) {
+      for (const img of m.images || []) {
+        if (img && typeof img === "object" && typeof img.idb === "string") {
+          try {
+            await idbDelete(img.idb);
+          } catch {}
+        }
+      }
+    }
+    try {
+      await idbChatDelete(id);
+    } catch {}
+  }
   chats = chats.filter((c) => c.id !== id);
-  saveChats();
+  await saveChats();
   if (activeChatId === id) newChat();
   else renderSidebar();
 }
-function clearChat() {
+async function clearChat() {
   stopStream();
   const c = getActiveChat();
   if (c) {
     c.messages = [];
     c.updatedAt = Date.now();
-    saveChats();
+    await saveChats();
   }
   resetWelcome();
   resetScrollPin();
@@ -172,12 +252,12 @@ function openChatPrompt() {
 function closeChatPrompt() {
   closeModalOverlay("cpOverlay");
 }
-function saveChatPrompt() {
+async function saveChatPrompt() {
   const c = ensureChat(); // saving from a fresh window is what starts that conversation
   const v = $("chatSysPrompt").value.trim().slice(0, CHAT_SYS_MAX);
   if (v) c.systemPrompt = v;
   else delete c.systemPrompt; // cleared → drop the key entirely
-  saveChats();
+  await saveChats();
   renderSidebar();
   syncChatPromptUI();
   closeChatPrompt();
@@ -192,8 +272,32 @@ function clearChatPrompt() {
   $("chatSysPrompt").value = "";
   saveChatPrompt();
 }
-function exportChats() {
-  const blob = new Blob([JSON.stringify(chats, null, 2)], {
+async function exportChats() {
+  // Clone chats to avoid mutating live state
+  let exportable;
+  try {
+    exportable = typeof structuredClone === "function"
+      ? structuredClone(chats)
+      : JSON.parse(JSON.stringify(chats));
+  } catch {
+    exportable = JSON.parse(JSON.stringify(chats));
+  }
+  // Hydrate any {idb} references to portable data URLs
+  for (const chat of exportable) {
+    for (const msg of chat.messages || []) {
+      if (!msg.images || !msg.images.length) continue;
+      for (let i = 0; i < msg.images.length; i++) {
+        const ref = msg.images[i];
+        if (ref && typeof ref === "object" && typeof ref.idb === "string") {
+          try {
+            const data = await idbGet(ref.idb);
+            if (typeof data === "string") msg.images[i] = data;
+          } catch {}
+        }
+      }
+    }
+  }
+  const blob = new Blob([JSON.stringify(exportable, null, 2)], {
     type: "application/json",
   });
   const a = document.createElement("a");
@@ -321,8 +425,6 @@ function importedChat(raw, have) {
       ? Number(raw.updatedAt)
       : Date.now(),
   };
-  // Per-chat prompts travel with the export — but as plain text, capped, never as
-  // whatever shape the file happened to carry (arrays/objects/10MB strings).
   const sp =
     typeof raw.systemPrompt === "string"
       ? raw.systemPrompt.trim().slice(0, CHAT_SYS_MAX)
@@ -334,7 +436,7 @@ function importChats(inp) {
   const f = inp.files[0];
   if (!f) return;
   const r = new FileReader();
-  r.onload = () => {
+  r.onload = async () => {
     try {
       const arr = JSON.parse(r.result);
       if (!Array.isArray(arr)) throw 0;
@@ -345,7 +447,8 @@ function importChats(inp) {
         if (c) chats.push(c);
       });
       const added = chats.length - start;
-      if (!saveChats()) {
+      const ok = await saveChats();
+      if (!ok) {
         chats.splice(start);
         return;
       }
@@ -358,7 +461,139 @@ function importChats(inp) {
   r.readAsText(f);
   inp.value = "";
 }
+/* ── Export to Markdown & Copy Transcript ── */
+function chatToMarkdown(chat) {
+  if (!chat) return "";
+  const title = String(chat.title || "Conversation").trim() || "Conversation";
+  const model = chat.model ? (MODELS[chat.model]?.name || chat.model) : "—";
+  const created = chat.createdAt ? new Date(chat.createdAt).toLocaleString() : "";
+  const updated = chat.updatedAt ? new Date(chat.updatedAt).toLocaleString() : "";
+  const sysPrompt = chat.systemPrompt ? String(chat.systemPrompt).trim() : "";
+  const globalSys = (() => { try { return localStorage.getItem("sys_prompt") || ""; } catch { return ""; } })();
+
+  let md = `# ${title}\n\n`;
+  md += `> **Model:** ${model} | **Created:** ${created} | **Updated:** ${updated} | **Messages:** ${(chat.messages||[]).length}\n>\n`;
+  if (globalSys) md += `> **Global System Prompt:** ${globalSys.replace(/\n/g, " ")}\n>\n`;
+  if (sysPrompt) md += `> **Chat System Prompt:** ${sysPrompt.replace(/\n/g, " ")}\n>\n`;
+  md += `\n---\n\n`;
+
+  for (const m of chat.messages || []) {
+    const role = m.role === "user" ? "You" : (m.meta?.pName || m.meta?.m || MODELS[chat.model]?.name || "AI");
+    md += `## ${m.role === "user" ? "You" : role}\n\n`;
+    if (m.thinking) {
+      md += `<details><summary>Thinking</summary>\n\n${String(m.thinking).trim()}\n\n</details>\n\n`;
+    }
+    const content = String(m.content || "").trim();
+    if (content) {
+      md += `${content}\n\n`;
+    } else if (m.role === "user" && (m.images?.length || m.files?.length)) {
+      md += `*(attachment only)*\n\n`;
+    }
+    if (m.images && m.images.length) {
+      const imgs = m.images.map((img) => {
+        if (typeof img === "string") return `- Image attached (${Math.round(img.length/1024)}KB)`;
+        if (img && typeof img === "object" && img.idb) return `- Image: ${img.name || "image"} (${img.mime || "image"}) [stored in IndexedDB]`;
+        return null;
+      }).filter(Boolean).join("\n");
+      if (imgs) md += `${imgs}\n\n`;
+    }
+    if (m.files && m.files.length) {
+      for (const f of m.files) {
+        const name = f.name || "file";
+        const lang = (fileExt(name) ? EXT_LANG[fileExt(name)] || "" : "");
+        md += `**File: ${name}**\n\n\`\`\`${lang}\n${String(f.text||"").slice(0, 20000)}\n\`\`\`\n\n`;
+      }
+    }
+    if (m.sources && m.sources.length) {
+      md += `**Sources:**\n`;
+      for (const s of m.sources) {
+        if (s && s.url) md += `- [${s.title || s.url}](${s.url})\n`;
+      }
+      md += `\n`;
+    }
+    md += `---\n\n`;
+  }
+  md += `\n*Exported from The Playground on ${new Date().toLocaleString()}*\n`;
+  return md;
+}
+
+async function exportCurrentChatAsMarkdown() {
+  const c = getActiveChat();
+  if (!c || !c.messages || !c.messages.length) {
+    logRot("No active conversation to export", "warn");
+    return;
+  }
+  // Ensure any IDB image refs are noted (we don't embed base64 in md for size)
+  let md;
+  try {
+    md = chatToMarkdown(c);
+  } catch (e) {
+    logRot("Markdown export failed: " + e.message, "err");
+    return;
+  }
+  const safeTitle = String(c.title || "chat").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60) || "chat";
+  const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = `${safeTitle}-${new Date().toISOString().slice(0,10)}.md`;
+  a.click();
+  URL.revokeObjectURL(a.href);
+  logRot("Chat exported as Markdown", "ok");
+}
+
+async function copyFullTranscript() {
+  const c = getActiveChat();
+  if (!c || !c.messages || !c.messages.length) {
+    logRot("No active conversation to copy", "warn");
+    return;
+  }
+  let md;
+  try {
+    md = chatToMarkdown(c);
+  } catch (e) {
+    logRot("Copy failed: " + e.message, "err");
+    return;
+  }
+  const showCopied = () => {
+    logRot("Full transcript copied to clipboard", "ok");
+    // Visual feedback on the button if present
+    const btn = $("copyTranscriptBtn");
+    if (btn) {
+      const orig = btn.textContent;
+      btn.textContent = "Copied!";
+      btn.classList.add("copied");
+      setTimeout(() => {
+        btn.textContent = orig;
+        btn.classList.remove("copied");
+      }, 1400);
+    }
+  };
+  if (window.isSecureContext && navigator.clipboard) {
+    try {
+      await navigator.clipboard.writeText(md);
+      showCopied();
+      return;
+    } catch {}
+  }
+  // Fallback for HTTP / LAN
+  const ta = document.createElement("textarea");
+  ta.value = md;
+  ta.style.position = "fixed";
+  ta.style.opacity = "0";
+  document.body.appendChild(ta);
+  ta.focus();
+  ta.select();
+  try {
+    document.execCommand("copy");
+    showCopied();
+  } catch {
+    logRot("Clipboard copy failed — try HTTPS or use Export .md", "err");
+  }
+  ta.remove();
+}
+
 function suggest(t) {
+  if (!userInput) return;
   userInput.value = t;
   userInput.focus();
   userInput.dispatchEvent(new Event("input"));
@@ -367,11 +602,10 @@ function pickFollowup(q) {
   if (isStreaming) return;
   const qs = String(q || "").trim();
   if (!qs) return;
+  if (!userInput) return;
   userInput.value = qs;
   userInput.style.height = "auto";
   userInput.style.height = Math.min(userInput.scrollHeight, 300) + "px";
   userInput.focus();
   sendMessage();
 }
-
-

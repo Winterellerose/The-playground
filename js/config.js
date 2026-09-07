@@ -195,7 +195,7 @@ const REG = {
     name: "Anthropic",
     type: "paid",
     url: "https://api.anthropic.com/v1/messages",
-    models: "",
+    models: "https://api.anthropic.com/v1/models",
     style: "anthropic",
     rpm: "tier-based",
   },
@@ -208,8 +208,44 @@ const REG = {
     usage: true,
     rpm: "tier-based",
   },
-  ollama: { name: "Ollama", type: "free", local: true, url: "http://localhost:11434/v1/chat/completions", models: "http://localhost:11434/v1/models", style: "openai", rpm: "local" },
-  lmstudio: { name: "LM Studio", type: "free", local: true, url: "http://localhost:1234/v1/chat/completions", models: "http://localhost:1234/v1/models", style: "openai", rpm: "local" },
+  ollama: {
+    name: "Ollama",
+    type: "free",
+    local: true,
+    get url() {
+      return (
+        (localStorage.getItem("url_ollama") || "http://localhost:11434") +
+        "/v1/chat/completions"
+      );
+    },
+    get models() {
+      return (
+        (localStorage.getItem("url_ollama") || "http://localhost:11434") +
+        "/v1/models"
+      );
+    },
+    style: "openai",
+    rpm: "local",
+  },
+  lmstudio: {
+    name: "LM Studio",
+    type: "free",
+    local: true,
+    get url() {
+      return (
+        (localStorage.getItem("url_lmstudio") || "http://localhost:1234") +
+        "/v1/chat/completions"
+      );
+    },
+    get models() {
+      return (
+        (localStorage.getItem("url_lmstudio") || "http://localhost:1234") +
+        "/v1/models"
+      );
+    },
+    style: "openai",
+    rpm: "local",
+  },
   sambanova: {
     name: "SambaNova",
     type: "paid",
@@ -255,6 +291,8 @@ const FALLBACK_ID = {
   openai: "gpt-5.5",
   anthropic: "claude-sonnet-5",
   sambanova: "Meta-Llama-3.3-70B-Instruct",
+  ollama: "llama3.2",
+  lmstudio: "default",
 };
 
 const GROUPS = [
@@ -354,7 +392,7 @@ const MODELS = {
   "glm-52": {
     name: "GLM 5.2",
     badge: "GLM 5.2",
-    group: "or_free",
+    group: "free",
     provider: "openrouter",
     apiId: "z-ai/glm-5.2:free",
     isFree: true,
@@ -365,7 +403,7 @@ const MODELS = {
   "lag-m": {
     name: "Laguna S 2.1",
     badge: "LAG-S",
-    group: "or_free",
+    group: "free",
     provider: "openrouter",
     apiId: "poolside/laguna-s-2.1:free",
     isFree: true,
@@ -377,7 +415,7 @@ const MODELS = {
   "lag-xs": {
     name: "Laguna XS 2.1",
     badge: "LAG-XS",
-    group: "or_free",
+    group: "free",
     provider: "openrouter",
     apiId: "poolside/laguna-xs-2.1:free",
     isFree: true,
@@ -389,7 +427,7 @@ const MODELS = {
   "nem-s": {
     name: "Nemotron 3 Super",
     badge: "NEM-S",
-    group: "or_free",
+    group: "free",
     provider: "openrouter",
     apiId: "nvidia/nemotron-3-super-120b-a12b:free",
     isFree: true,
@@ -401,7 +439,7 @@ const MODELS = {
   "gemma-4": {
     name: "Gemma 4 26B A4B",
     badge: "GEMMA 4",
-    group: "or_free",
+    group: "free",
     provider: "openrouter",
     apiId: "google/gemma-4-26b-a4b-it:free",
     isFree: true,
@@ -416,7 +454,7 @@ const MODELS = {
   "groq-oss120": {
     name: "GPT-OSS 120B",
     badge: "OSS 120B",
-    group: "groq",
+    group: "free",
     provider: "groq",
     apiId: "openai/gpt-oss-120b",
     isFree: true,
@@ -427,7 +465,7 @@ const MODELS = {
   "groq-oss20": {
     name: "GPT-OSS 20B",
     badge: "OSS 20B",
-    group: "groq",
+    group: "free",
     provider: "groq",
     apiId: "openai/gpt-oss-20b",
     isFree: true,
@@ -438,7 +476,7 @@ const MODELS = {
   "groq-qwen36": {
     name: "Qwen3.6 27B",
     badge: "QWEN 3.6",
-    group: "groq",
+    group: "free",
     provider: "groq",
     apiId: "qwen/qwen3.6-27b",
     isFree: true,
@@ -450,7 +488,7 @@ const MODELS = {
   "groq-compound": {
     name: "Compound",
     badge: "COMPOUND",
-    group: "groq",
+    group: "free",
     provider: "groq",
     apiId: "groq/compound",
     isFree: true,
@@ -462,7 +500,7 @@ const MODELS = {
   "cb-oss120": {
     name: "GPT-OSS 120B",
     badge: "OSS 120B",
-    group: "cerebras",
+    group: "free",
     provider: "cerebras",
     apiId: "gpt-oss-120b",
     isFree: true,
@@ -473,7 +511,7 @@ const MODELS = {
   "cb-gemma": {
     name: "Gemma 4 31B",
     badge: "GEMMA 4",
-    group: "cerebras",
+    group: "free",
     provider: "openrouter",
     apiId: "google/gemma-4-31b-it:free",
     isFree: true,
@@ -486,7 +524,7 @@ const MODELS = {
   g36f: {
     name: "Gemini 3.6 Flash",
     badge: "GEM 3.6",
-    group: "gemini",
+    group: "free",
     provider: "gemini",
     apiId: "gemini-3.6-flash",
     isFree: true,
@@ -498,7 +536,7 @@ const MODELS = {
   g35l: {
     name: "Gemini 3.5 Flash-Lite",
     badge: "GEM 3.5L",
-    group: "gemini",
+    group: "free",
     provider: "gemini",
     apiId: "gemini-3.5-flash-lite",
     isFree: true,
@@ -511,7 +549,7 @@ const MODELS = {
   g31p: {
     name: "Gemini 3.1 Pro",
     badge: "GEM 3.1P",
-    group: "gemini",
+    group: "premium",
     provider: "openrouter_paid",
     apiId: "google/gemini-3.1-pro-preview",
     isFree: false,
@@ -523,7 +561,7 @@ const MODELS = {
   g25p: {
     name: "Gemini 2.5 Pro",
     badge: "GEM 2.5P",
-    group: "gemini",
+    group: "premium",
     provider: "openrouter_paid",
     apiId: "google/gemini-2.5-pro",
     isFree: false,
@@ -536,7 +574,7 @@ const MODELS = {
   "mi-small": {
     name: "Mistral Small",
     badge: "MISTRAL S",
-    group: "mistral",
+    group: "free",
     provider: "mistral",
     apiId: "mistral-small-latest",
     isFree: true,
@@ -547,7 +585,7 @@ const MODELS = {
   "mi-mini": {
     name: "Ministral 8B",
     badge: "MINISTRAL",
-    group: "mistral",
+    group: "free",
     provider: "mistral",
     apiId: "ministral-8b-latest",
     isFree: true,
@@ -560,7 +598,7 @@ const MODELS = {
   "co-a+": {
     name: "Command A+",
     badge: "CMD A+",
-    group: "cohere",
+    group: "free",
     provider: "cohere",
     apiId: "command-a-plus-05-2026",
     isFree: true,
@@ -572,7 +610,7 @@ const MODELS = {
   "co-ar": {
     name: "Command A Reasoning",
     badge: "CMD AR",
-    group: "cohere",
+    group: "free",
     provider: "cohere",
     apiId: "command-a-reasoning-08-2025",
     isFree: true,
@@ -584,7 +622,7 @@ const MODELS = {
   "nv-llama33": {
     name: "Llama 3.3 70B",
     badge: "LLAMA 3.3",
-    group: "nvidia",
+    group: "free",
     provider: "nvidia",
     apiId: "meta/llama-3.3-70b-instruct",
     isFree: true,
@@ -595,7 +633,7 @@ const MODELS = {
   "nv-dsv4f": {
     name: "DeepSeek V4 Flash",
     badge: "DS V4F",
-    group: "nvidia",
+    group: "free",
     provider: "nvidia",
     apiId: "deepseek-ai/deepseek-v4-flash",
     isFree: true,
@@ -607,7 +645,7 @@ const MODELS = {
   "ds-v4f": {
     name: "DeepSeek V4 Flash",
     badge: "DS V4F",
-    group: "deepseek",
+    group: "premium",
     provider: "openrouter_paid",
     apiId: "deepseek/deepseek-v4-flash",
     isFree: false,
@@ -619,7 +657,7 @@ const MODELS = {
   "ds-v4p": {
     name: "DeepSeek V4 Pro",
     badge: "DS V4P",
-    group: "deepseek",
+    group: "premium",
     provider: "openrouter_paid",
     apiId: "deepseek/deepseek-v4-pro",
     isFree: false,
@@ -632,7 +670,7 @@ const MODELS = {
   "kimi-latest": {
     name: "Kimi Latest",
     badge: "KIMI ∞",
-    group: "or_paid",
+    group: "premium",
     provider: "openrouter_paid",
     apiId: "~moonshotai/kimi-latest",
     isFree: false,
@@ -645,7 +683,7 @@ const MODELS = {
   "gpt-latest": {
     name: "GPT Latest",
     badge: "GPT ∞",
-    group: "or_paid",
+    group: "premium",
     provider: "openrouter_paid",
     apiId: "~openai/gpt-latest",
     isFree: false,
@@ -659,7 +697,7 @@ const MODELS = {
   "opus-5": {
     name: "Claude Opus 5",
     badge: "OPUS 5",
-    group: "anthropic",
+    group: "premium",
     provider: "anthropic",
     apiId: "claude-opus-5",
     isFree: false,
@@ -672,7 +710,7 @@ const MODELS = {
   "fable-5": {
     name: "Claude Fable 5",
     badge: "FABLE 5",
-    group: "anthropic",
+    group: "premium",
     provider: "anthropic",
     apiId: "claude-fable-5",
     isFree: false,
@@ -685,7 +723,7 @@ const MODELS = {
   "sonnet-5": {
     name: "Claude Sonnet 5",
     badge: "SONNET 5",
-    group: "anthropic",
+    group: "premium",
     provider: "anthropic",
     apiId: "claude-sonnet-5",
     isFree: false,
@@ -698,7 +736,7 @@ const MODELS = {
   "opus-48": {
     name: "Claude Opus 4.8",
     badge: "OPUS 4.8",
-    group: "anthropic",
+    group: "premium",
     provider: "anthropic",
     apiId: "claude-opus-4-8",
     isFree: false,
@@ -711,7 +749,7 @@ const MODELS = {
   "haiku-45": {
     name: "Claude Haiku 4.5",
     badge: "HAIKU 4.5",
-    group: "anthropic",
+    group: "premium",
     provider: "anthropic",
     apiId: "claude-haiku-4-5",
     isFree: false,
@@ -724,7 +762,7 @@ const MODELS = {
   "glm-51": {
     name: "GLM-5.1",
     badge: "GLM-5.1",
-    group: "zai",
+    group: "premium",
     provider: "zai",
     apiId: "glm-5.1",
     isFree: false,
@@ -736,7 +774,7 @@ const MODELS = {
   "glm-5": {
     name: "GLM-5",
     badge: "GLM-5",
-    group: "zai",
+    group: "premium",
     provider: "zai",
     apiId: "glm-5",
     isFree: false,
@@ -748,7 +786,7 @@ const MODELS = {
   "glm-47": {
     name: "GLM-4.7",
     badge: "GLM-4.7",
-    group: "zai",
+    group: "premium",
     provider: "zai",
     apiId: "glm-4.7",
     isFree: false,
@@ -761,7 +799,7 @@ const MODELS = {
   "gpt-55": {
     name: "GPT-5.5",
     badge: "GPT-5.5",
-    group: "openai",
+    group: "premium",
     provider: "openai",
     apiId: "gpt-5.5",
     isFree: false,
@@ -774,7 +812,7 @@ const MODELS = {
   "gpt-55p": {
     name: "GPT-5.5 Pro",
     badge: "5.5 PRO",
-    group: "openai",
+    group: "premium",
     provider: "openai",
     apiId: "gpt-5.5-pro",
     isFree: false,
@@ -787,7 +825,7 @@ const MODELS = {
   "kimi-25": {
     name: "Kimi K2.5",
     badge: "KIMI K2.5",
-    group: "moonshot",
+    group: "premium",
     provider: "openrouter_paid",
     apiId: "moonshotai/kimi-k2.5",
     isFree: false,

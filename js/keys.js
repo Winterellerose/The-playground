@@ -61,20 +61,24 @@ async function testKey(pid) {
     btn = $("test_" + pid);
   if (!key) {
     setDot(pid, "empty");
-    btn.textContent = "Test";
-    btn.className = "btn-test";
+    if (btn) {
+      btn.textContent = "Test";
+      btn.className = "btn-test";
+    }
     return logRot(`${REG[pid].name}: no key to test`, "warn");
   }
   if (!REG[pid].models) {
     setDot(pid, "ok");
-    btn.textContent = "OK ✓";
-    btn.className = "btn-test ok";
+    if (btn) {
+      btn.textContent = "OK ✓";
+      btn.className = "btn-test ok";
+    }
     return logRot(
       `${REG[pid].name}: key saved (no list endpoint to ping)`,
       "ok",
     );
   }
-  btn.textContent = "…";
+  if (btn) btn.textContent = "…";
   try {
     const h = { "Content-Type": "application/json" };
     if (pid === "anthropic") {
@@ -82,17 +86,24 @@ async function testKey(pid) {
       h["anthropic-version"] = "2023-06-01";
       h["anthropic-dangerous-direct-browser-access"] = "true";
     } else h["Authorization"] = "Bearer " + key;
-    const res = await fetch(REG[pid].models, { headers: h });
+    const res = await fetch(REG[pid].models, {
+      headers: h,
+      signal: AbortSignal.timeout(8000),
+    });
     if (res.ok) {
       setDot(pid, "ok");
-      btn.textContent = "OK ✓";
-      btn.className = "btn-test ok";
+      if (btn) {
+        btn.textContent = "OK ✓";
+        btn.className = "btn-test ok";
+      }
       logRot(`${REG[pid].name} key valid`, "ok");
     } else throw new Error(res.status);
   } catch (e) {
     setDot(pid, "bad");
-    btn.textContent = "Fail";
-    btn.className = "btn-test err";
+    if (btn) {
+      btn.textContent = "Fail";
+      btn.className = "btn-test err";
+    }
     logRot(`${REG[pid].name} key test failed (${e.message})`, "err");
   }
 }
@@ -104,16 +115,21 @@ function loadAll() {
   $("sysPrompt").value = localStorage.getItem("sys_prompt") || "";
   $("maxTok").value = localStorage.getItem("pg_maxtok") || "8192";
   $("extrasMode").value = localStorage.getItem("pg_extras_mode") || "free";
+  if ($("effortSelect")) $("effortSelect").value = localStorage.getItem("pg_effort") || "high";
+  if ($("tempSelect")) $("tempSelect").value = localStorage.getItem("pg_temp") || "1.0";
   loadSearchCfg();
   refreshKeyUI();
 }
 function saveAll() {
-  KEY_DEFS.forEach(([pid]) =>
-    localStorage.setItem("key_" + pid, $(KEY_INPUTS[pid]).value),
-  );
+  KEY_DEFS.forEach(([pid]) => {
+    const el = $(KEY_INPUTS[pid]);
+    if (el) localStorage.setItem("key_" + pid, el.value);
+  });
   localStorage.setItem("sys_prompt", $("sysPrompt").value);
   localStorage.setItem("pg_maxtok", $("maxTok").value || "8192");
   localStorage.setItem("pg_extras_mode", $("extrasMode").value || "free");
+  localStorage.setItem("pg_effort", $("effortSelect").value);
+  localStorage.setItem("pg_temp", $("tempSelect").value);
   refreshKeyUI();
 }
 function loadSearchCfg() {
@@ -163,4 +179,20 @@ function refreshKeyUI() {
   $("paidKeyCount").textContent = `${p} key${p !== 1 ? "s" : ""} set`;
 }
 
-async function refreshLocalStatus() { for (const pid of Object.keys(REG).filter((p)=>REG[p].local)) { const el=$("local_"+pid); try { const r=await fetch(REG[pid].models); if(el) el.textContent=REG[pid].name+" — "+(r.ok?"reachable":"not reachable"); } catch { if(el) el.textContent=REG[pid].name+" — not reachable"; } } }
+async function refreshLocalStatus() {
+  const localPids = Object.keys(REG).filter((p) => REG[p].local);
+  await Promise.allSettled(
+    localPids.map(async (pid) => {
+      const el = $("local_" + pid);
+      try {
+        const r = await fetch(REG[pid].models, {
+          signal: AbortSignal.timeout(1500),
+        });
+        if (el)
+          el.textContent = `${REG[pid].name} — ${r.ok ? "reachable" : "not reachable"}`;
+      } catch {
+        if (el) el.textContent = `${REG[pid].name} — not reachable`;
+      }
+    }),
+  );
+}
