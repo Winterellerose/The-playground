@@ -24,7 +24,6 @@ const ACT = {
   "import-chats": () => $("importFile").click(),
   "clear-chat": () => clearChat(),
   "attach": () => attachClick(),
-  "camera": () => cameraClick(),
   "test-key": (b) => testKey(b.dataset.pid),
   "jump-latest": () => jumpToLatest(),
   
@@ -110,10 +109,6 @@ function bindEvents() {
   );
   $("imgFile").addEventListener("change", (e) => {
     addAttachFiles(e.target.files);
-    e.target.value = "";
-  });
-  $("camFile").addEventListener("change", (e) => {
-    addImageFiles(e.target.files);
     e.target.value = "";
   });
   userInput.addEventListener("input", autoResizeInput);

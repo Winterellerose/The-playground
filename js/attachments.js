@@ -48,22 +48,12 @@ function setAttachUI() {
   const b = $("attachBtn");
   if (!b) return;
   b.classList.remove("disabled");
-  const vc = visionCapable();
-  b.title = vc
+  b.title = visionCapable()
     ? "Attach files or images — drag, paste, or click"
     : "Attach text/code files — drag, paste, or click (images need a VISION model)";
-  const c = $("camBtn");
-  if (c) c.hidden = !vc;
 }
 function attachClick() {
   $("imgFile").click();
-}
-function cameraClick() {
-  if (!visionCapable()) {
-    logRot("Camera needs a VISION model selected", "warn");
-    return;
-  }
-  $("camFile").click();
 }
 function compressImage(file) {
   return new Promise((res, rej) => {
