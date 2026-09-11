@@ -2227,3 +2227,207 @@ header {
 .scroll-jump{position:absolute;bottom:calc(100% - 6px);left:50%;transform:translateX(-50%);display:inline-flex;align-items:center;gap:4px;background:var(--surface3);border:1px solid var(--border-strong);color:var(--text);border-radius:16px;padding:5px 14px;font-family:var(--font-mono);font-size:0.62rem;letter-spacing:0.08em;text-transform:uppercase;cursor:pointer;z-index:30;box-shadow:0 4px 16px rgba(0,0,0,0.45);transition:all 0.15s}
 .scroll-jump:hover{border-color:var(--free);color:var(--free)}
 .scroll-jump[hidden]{display:none}
+
+/* ══════════════════════════════════════════════════════════════════
+   STUNNING PASS — aurora ambience, glass surfaces, choreographed
+   messages, glowing accents. Pure CSS, compositor-friendly
+   (transform/opacity only), file:// safe — no external assets.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── 1. Aurora ambience behind everything ── */
+body::before {
+  content: "";
+  position: fixed;
+  inset: -20%;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(42% 38% at 18% 12%, rgba(126, 200, 180, 0.075), transparent 70%),
+    radial-gradient(40% 36% at 85% 16%, rgba(212, 198, 106, 0.065), transparent 70%),
+    radial-gradient(46% 42% at 80% 88%, rgba(232, 156, 108, 0.06), transparent 70%),
+    radial-gradient(38% 34% at 10% 86%, rgba(126, 200, 180, 0.05), transparent 70%);
+  animation: auroraDrift 38s ease-in-out infinite alternate;
+  will-change: transform;
+}
+@keyframes auroraDrift {
+  from { transform: translate3d(-2%, -1.5%, 0) scale(1); }
+  to { transform: translate3d(2%, 2%, 0) scale(1.07); }
+}
+.app { position: relative; z-index: 1; }
+
+/* ── 2. Glass surfaces — sidebar, chat frame, modals ── */
+.sidebar {
+  background: rgba(15, 15, 14, 0.74);
+  -webkit-backdrop-filter: blur(16px) saturate(1.15);
+  backdrop-filter: blur(16px) saturate(1.15);
+}
+.chat-frame {
+  background: rgba(17, 17, 17, 0.6);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+  backdrop-filter: blur(14px) saturate(1.1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 24px 70px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+.mp-modal,
+.st-modal {
+  background: rgba(22, 22, 20, 0.84);
+  -webkit-backdrop-filter: blur(22px) saturate(1.2);
+  backdrop-filter: blur(22px) saturate(1.2);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 28px 90px rgba(0, 0, 0, 0.62),
+    0 0 46px rgba(126, 200, 180, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+/* ── 3. Glass input bar with prism focus glow ── */
+.input-row textarea {
+  background: rgba(20, 20, 18, 0.68);
+  -webkit-backdrop-filter: blur(16px) saturate(1.25);
+  backdrop-filter: blur(16px) saturate(1.25);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 16px;
+  box-shadow:
+    0 10px 34px rgba(0, 0, 0, 0.42),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: border-color 0.25s, box-shadow 0.25s;
+}
+.input-row textarea:focus {
+  border-color: rgba(126, 200, 180, 0.45);
+  box-shadow:
+    0 10px 34px rgba(0, 0, 0, 0.42),
+    0 0 0 1px rgba(126, 200, 180, 0.12),
+    0 0 30px rgba(126, 200, 180, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+.send-btn {
+  background: linear-gradient(135deg, #7ec8b4 0%, #d4c66a 100%);
+  color: #0c0c0a;
+  font-weight: 600;
+  box-shadow: 0 4px 20px rgba(126, 200, 180, 0.28);
+  transition: transform 0.14s, box-shadow 0.2s, filter 0.14s;
+}
+.send-btn:hover {
+  filter: brightness(1.07);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 26px rgba(126, 200, 180, 0.36);
+}
+.send-btn:active { transform: translateY(0); }
+.send-btn.stopping {
+  background: var(--danger);
+  box-shadow: 0 4px 20px rgba(232, 154, 154, 0.25);
+}
+.attach-btn:hover {
+  border-color: rgba(126, 200, 180, 0.5);
+  color: var(--prism-a);
+  box-shadow: 0 0 16px rgba(126, 200, 180, 0.12);
+  transform: translateY(-1px);
+}
+
+/* ── 4. Choreographed messages + glowing stream caret ── */
+.msg.assistant { animation: msgIn 0.42s cubic-bezier(0.21, 0.9, 0.35, 1); }
+.msg.user { animation: msgInUser 0.3s ease-out; }
+@keyframes msgIn {
+  from { opacity: 0; transform: translateY(12px); filter: blur(5px); }
+  to { opacity: 1; transform: translateY(0); filter: blur(0); }
+}
+@keyframes msgInUser {
+  from { opacity: 0; transform: translateY(6px) scale(0.995); }
+  to { opacity: 1; transform: none; }
+}
+.streaming-cursor::after {
+  color: var(--prism-a);
+  text-shadow: 0 0 10px rgba(126, 200, 180, 0.9);
+}
+.msg-role.assistant {
+  background: linear-gradient(90deg, #7ec8b4, #d4c66a);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+/* ── 5. Welcome glow-up ── */
+.welcome h2 {
+  background: linear-gradient(105deg, #f0ebe3 10%, #e8d98a 42%, #7ec8b4 72%, #e89c6c 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  filter: drop-shadow(0 2px 26px rgba(212, 198, 106, 0.14));
+}
+.prism {
+  filter:
+    drop-shadow(0 0 30px rgba(212, 198, 106, 0.4))
+    drop-shadow(0 0 70px rgba(126, 200, 180, 0.2));
+}
+.suggest-btn { transition: transform 0.18s, border-color 0.18s, box-shadow 0.18s, background 0.18s; }
+.suggest-btn:hover {
+  transform: translateY(-2px);
+  border-color: rgba(126, 200, 180, 0.45);
+  background: var(--surface3);
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.42), 0 0 18px rgba(126, 200, 180, 0.08);
+}
+
+/* ── 6. Sidebar — active chat with prism edge ── */
+.sb-item { border: 1px solid transparent; }
+.sb-item.active {
+  background: linear-gradient(180deg, rgba(126, 200, 180, 0.1), rgba(126, 200, 180, 0.035));
+  border-color: rgba(126, 200, 180, 0.22);
+}
+.sb-item.active::before {
+  content: "";
+  position: absolute;
+  left: -1px;
+  top: 9px;
+  bottom: 9px;
+  width: 2px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #7ec8b4, #d4c66a);
+  box-shadow: 0 0 10px rgba(126, 200, 180, 0.75);
+}
+.sb-model-tag {
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.03);
+}
+.sb-new {
+  background: linear-gradient(135deg, rgba(126, 200, 180, 0.13), rgba(212, 198, 106, 0.09));
+  border: 1px solid rgba(126, 200, 180, 0.26);
+}
+.sb-new:hover {
+  border-color: rgba(126, 200, 180, 0.55);
+  box-shadow: 0 0 18px rgba(126, 200, 180, 0.13);
+}
+
+/* ── 7. Scrollbars + selection ── */
+::selection { background: rgba(126, 200, 180, 0.32); color: #fff; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: #2d2d29;
+  border-radius: 8px;
+  border: 3px solid rgba(10, 10, 10, 0);
+  background-clip: padding-box;
+}
+::-webkit-scrollbar-thumb:hover { background: #3e3e36; background-clip: padding-box; }
+html { scrollbar-width: thin; scrollbar-color: #2d2d29 transparent; }
+
+/* ── 8. Landing — let the aurora glow through ── */
+.landing {
+  background: rgba(10, 10, 10, 0.66);
+  -webkit-backdrop-filter: blur(12px);
+  backdrop-filter: blur(12px);
+}
+
+/* ── 9. Calm it all down when motion is unwelcome ── */
+@media (prefers-reduced-motion: reduce) {
+  body::before { animation: none; }
+  .msg.assistant,
+  .msg.user { animation: fadeIn 0.2s ease; }
+  .prism, .landing-prism { animation: none; }
+  .suggest-btn:hover,
+  .send-btn:hover,
+  .attach-btn:hover { transform: none; }
+}
