@@ -242,7 +242,7 @@ const KEY_INPUTS = {
 // (glm-4.5-air:free, gemini-3-flash-preview, gpt-5.4-mini and claude-sonnet-4-5
 // were replaced — see the v2.9.2 changelog). Re-audit: npm run audit:models.
 const FALLBACK_ID = {
-  openrouter: "z-ai/glm-5.2:free",
+  openrouter: "nvidia/nemotron-3-ultra-550b-a55b:free",
   groq: "openai/gpt-oss-120b",
   cerebras: "gpt-oss-120b",
   gemini: "gemini-3.5-flash-lite",
@@ -351,17 +351,6 @@ const MODELS = {
     desc: "Hybrid Mamba-Transformer MoE frontier reasoner. FREE.",
   },
   /* ── OpenRouter free ── */
-  "glm-52": {
-    name: "GLM 5.2",
-    badge: "GLM 5.2",
-    group: "or_free",
-    provider: "openrouter",
-    apiId: "z-ai/glm-5.2:free",
-    isFree: true,
-    intel: 4,
-    ctx: "256K",
-    desc: "Top-tier free coder + agentic reasoner from Z.ai.",
-  },
   "lag-m": {
     name: "Laguna S 2.1",
     badge: "LAG-S",
