@@ -183,12 +183,14 @@
   <div class="input-row">
     <button class="attach-btn" id="attachBtn" data-act="attach" title="Attach files or images" aria-label="Attach files or images"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg></button>
     <button class="attach-btn" id="micBtn" data-act="voice" title="Voice input" aria-label="Voice input" hidden>🎙</button>
+    <button class="attach-btn" id="camBtn" data-act="camera" title="Take a photo" aria-label="Take a photo" hidden>📷</button>
     <textarea id="userInput" placeholder="Send a message…" rows="1" aria-label="Message"></textarea>
     <button class="send-btn" id="sendBtn">Send <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg></button>
   </div>
   <div class="input-hint" style="display:none">Enter to send · Shift+Enter newline · Ctrl/Cmd+K models · Ctrl/Cmd+Shift+O new chat · Tab indents · Free keys rotate automatically · Drop / paste files · images on VISION models</div>
 </div>
 <input type="file" id="imgFile" accept="image/*,.txt,.md,.markdown,.json,.csv,.js,.mjs,.cjs,.ts,.tsx,.jsx,.py,.rb,.go,.rs,.java,.c,.h,.hpp,.hh,.cpp,.cc,.cxx,.cs,.html,.htm,.css,.xml,.yml,.yaml,.sql,.sh,.bash,.zsh,.ksh" multiple style="display:none">
+<input type="file" id="camFile" accept="image/*" capture="environment" style="display:none">
 <div class="drop-overlay" id="dropOverlay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg><span>Drop files or images to attach</span></div>
 </main>
 </div>
