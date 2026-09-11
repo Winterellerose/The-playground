@@ -7141,12 +7141,22 @@ function buildRequest(cfg, hist) {
     if (sys) rb.system = sys;
     if (m.adaptive) {
       /* adaptive models manage thinking themselves; no temp */
-    } else if (cfg.thinking && m.thinking === true) {
+    } else if (cfg.thinking && m.thinking === true && cfg.maxTok >= 3072) {
+      // Anthropic requires 1024 <= budget_tokens < max_tokens. Below 3072
+      // max tokens there is no room for the 2048 budget plus answer headroom,
+      // so fall through to a plain temperature request (with a warning).
       rb.thinking = {
         type: "enabled",
         budget_tokens: Math.min(10240, Math.max(2048, cfg.maxTok - 2048)),
       };
-    } else rb.temperature = cfg.temp;
+    } else {
+      if (cfg.thinking && m.thinking === true)
+        logRot(
+          "⚠️ Thinking off: max tokens too low for a thinking budget",
+          "warn",
+        );
+      rb.temperature = cfg.temp;
+    }
     return { h, rb };
   }
   const h = { "Content-Type": "application/json" };
