@@ -1,0 +1,23 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      # Runs the no-inline-handlers scan, node --check on every js/*.js,
+      # and the single-file build (npm test = node tests/run.js).
+      - run: npm test
+      # docs/index.html is committed to the repo, so fail if the committed
+      # artifact is stale relative to the sources.
+      - name: Built artifact is in sync
+        run: git diff --exit-code -- docs/
