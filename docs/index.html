@@ -4804,7 +4804,13 @@ try {
   chats = [];
 }
 let activeChatId = localStorage.getItem("active_chat_id") || null;
-let customModels = JSON.parse(localStorage.getItem("pg_custom_models") || "[]");
+let customModels = [];
+try {
+  customModels = JSON.parse(localStorage.getItem("pg_custom_models") || "[]");
+  if (!Array.isArray(customModels)) customModels = [];
+} catch {
+  customModels = [];
+}
 let selectedModel = localStorage.getItem("selected_model");
 let isStreaming = false,
   abortCtrl = null,
@@ -4863,6 +4869,13 @@ function fmtFileSize(n) {
   if (n < 1024) return n + " B";
   if (n < 1024 * 1024) return (n / 1024).toFixed(n < 10 * 1024 ? 1 : 0) + " KB";
   return (n / 1048576).toFixed(2) + " MB";
+}
+function parseCtx(v) {
+  // "262K" → 262000 · "1.3M" → 1300000 · "131000" → 131000 · garbage → 0
+  const m = /([\d.]+)\s*([kKmM])?/.exec(String(v || ""));
+  if (!m) return 0;
+  const n = parseFloat(m[1]) || 0;
+  return Math.round(n * (m[2] ? (/m/i.test(m[2]) ? 1e6 : 1e3) : 1));
 }
 function nowStamp() {
   try {
@@ -5424,7 +5437,7 @@ function applyCatalog(list) {
       apiId: mo.id,
       isFree: mo.free,
       intel: mo.free ? 3 : 4,
-      ctx: fmtCtx(mo.ctx || (r.local ? 8192 : 0)),
+      ctx: fmtCtx(mo.ctx || 0),
       vision: mo.vision,
       live: true,
       pricing: mo.pricing,
@@ -6262,7 +6275,7 @@ function toggleThinking() {
   syncToggle(t);
 }
 function updateUsageMeter() {
-  const c=getActiveChat(), m=MODELS[selectedModel]||{}, ctx=Number(String(m.ctx||'').replace(/[^0-9]/g,''))*(/k/i.test(String(m.ctx||''))?1000:1);
+  const c=getActiveChat(), m=MODELS[selectedModel]||{}, ctx=parseCtx(m.ctx);
   const used=(c?.messages||[]).reduce((n,x)=>n+(x.meta&&Number(x.meta.in)+Number(x.meta.out)||Math.ceil(String(x.content||'').length/4)),0);
   const cost=(c?.messages||[]).reduce((n,x)=>n+(x.meta&&REG[x.meta.p]&&REG[x.meta.p].metered ? 0 : 0),0);
   const el=$("frameMeta"); if(el) el.textContent="— "+REG[m.provider]?.name?.toUpperCase()+" · "+m.badge?.toUpperCase()+" · "+(ctx?Math.round(used/1000)+"k / "+Math.round(ctx/1000)+"k":"est. —")+(REG[m.provider]?.type === "free" || REG[m.provider]?.local ? " · free" : " · est. cost");
@@ -7421,7 +7434,7 @@ function wireHist(hist, cfg) {
 }
 function cleanHistory(c, targetIdx) {
   let h = c.messages.slice(0, targetIdx).filter((x) => (x.role === "user" && ((x.content||"").trim() || (x.images&&x.images.length) || (x.files&&x.files.length))) || (x.role === "assistant" && ((x.content||"").trim() || (x.thinking||"").trim())));
-  const model = MODELS[c.model || selectedModel] || {}, raw = String(model.ctx || ""), ctx = Number(raw.replace(/[^0-9]/g, "")) * (/k/i.test(raw) ? 1000 : 1);
+  const model = MODELS[c.model || selectedModel] || {}, ctx = parseCtx(model.ctx);
   if (!ctx) h = h.slice(-60); else { const max=Math.max(1,(ctx-(parseInt($("maxTok").value)||8192))*.95); const tok=()=>h.reduce((n,x)=>n+Math.ceil(((x.content||"")+(x.thinking||"")).length/4),0); while(h.length>1 && tok()>max) h.shift(); if(h[0] && h[0].role === "assistant") h.shift(); }
   return h.map((x) => { const o={role:x.role,content:x.content||""}; if(x.role === "user" && x.images) o.images=x.images; if(x.role === "user" && x.files) o.files=x.files; return o; });
 }
