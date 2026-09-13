@@ -5,6 +5,12 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- CSP: the single-file artifact ships all scripts inline, so 'unsafe-inline'
+     on script-src is inherent; the value is in connect-src, which pins every
+     host the app may talk to (REG providers + search APIs + local servers) so
+     injected script can't exfiltrate keys elsewhere. Adding a provider in
+     js/config.js means adding its origin here too. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src https: data:; connect-src https://openrouter.ai https://api.groq.com https://api.cerebras.ai https://generativelanguage.googleapis.com https://api.mistral.ai https://api.cohere.com https://integrate.api.nvidia.com https://api.deepseek.com https://api.z.ai https://api.anthropic.com https://api.openai.com https://api.sambanova.ai https://api.tavily.com https://google.serper.dev https://api.search.brave.com http://localhost:11434 http://localhost:1234; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <title>The Playground — Multi-Provider AI Studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -6287,8 +6293,12 @@ function toggleThinking() {
 function updateUsageMeter() {
   const c=getActiveChat(), m=MODELS[selectedModel]||{}, ctx=parseCtx(m.ctx);
   const used=(c?.messages||[]).reduce((n,x)=>n+(x.meta&&Number(x.meta.in)+Number(x.meta.out)||Math.ceil(String(x.content||'').length/4)),0);
-  const cost=(c?.messages||[]).reduce((n,x)=>n+(x.meta&&REG[x.meta.p]&&REG[x.meta.p].metered ? 0 : 0),0);
-  const el=$("frameMeta"); if(el) el.textContent="— "+REG[m.provider]?.name?.toUpperCase()+" · "+m.badge?.toUpperCase()+" · "+(ctx?Math.round(used/1000)+"k / "+Math.round(ctx/1000)+"k":"est. —")+(REG[m.provider]?.type === "free" || REG[m.provider]?.local ? " · free" : " · est. cost");
+  // Live catalog entries carry per-token pricing; estimate from the model each
+  // answer actually used (rotation may differ from the selected one). Curated
+  // entries have no pricing data, so those chats show no $ tag instead of a fake one.
+  const cost=(c?.messages||[]).reduce((n,x)=>{ const pr=x.meta&&x.meta.m&&(Object.values(MODELS).find(v=>v.apiId===x.meta.m&&v.pricing)||{}).pricing; return pr?n+(Number(x.meta.in)||0)*(parseFloat(pr.prompt)||0)+(Number(x.meta.out)||0)*(parseFloat(pr.completion)||0):n; },0);
+  const tag=cost>0?" · ~$"+(cost<0.01?cost.toFixed(4):cost.toFixed(2)):REG[m.provider]?.type === "free" || REG[m.provider]?.local ? " · free" : "";
+  const el=$("frameMeta"); if(el) el.textContent="— "+REG[m.provider]?.name?.toUpperCase()+" · "+m.badge?.toUpperCase()+" · "+(ctx?Math.round(used/1000)+"k / "+Math.round(ctx/1000)+"k":"est. —")+tag;
 }
 
 /* ═══ js/attachments.js ═══ */
@@ -6771,8 +6781,13 @@ function sourcesHtml(srcs) {
 /* ═══ chats.js — chat CRUD, sidebar, per-chat prompts, import/export ═══ */
 
 /* ── Chats ── */
+let saveSeq = 0; // a newer saveChats() supersedes the deferred post-migration write
 function saveChats() {
-  const active=getActiveChat(); if(active) moveLargeImages(active).then(() => { try { localStorage.setItem("chat_history", JSON.stringify(chats)); } catch {} });
+  const active=getActiveChat();
+  if (active) {
+    const seq=++saveSeq;
+    moveLargeImages(active).then(() => { if (seq!==saveSeq) return; try { localStorage.setItem("chat_history", JSON.stringify(chats)); } catch {} });
+  }
   try {
     localStorage.setItem("chat_history", JSON.stringify(chats));
     return true;
@@ -7564,7 +7579,8 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
     t0 = performance.now();
   let pulse = null,
     block = null,
-    lastHl = 0;
+    lastHl = 0,
+    lastRender = 0;
 
   try {
     logRot(
@@ -7709,18 +7725,23 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
           pulse = null;
         }
         full += txt;
-        const tHead = body.querySelector(".thinking-block")
-          ? body.querySelector(".thinking-block").outerHTML
-          : "";
-        body.innerHTML = tHead + renderMd(full, true);
-        body.classList.add("streaming-cursor");
         body.dataset.raw = full;
         const now = performance.now();
-        if (now - lastHl > 800) {
-          highlight(body);
-          lastHl = now;
+        // A full parse+sanitize pass per chunk janks on fast streams; re-render
+        // at most every 120ms. The completion path always renders the final text.
+        if (now - lastRender >= 120) {
+          const tHead = body.querySelector(".thinking-block")
+            ? body.querySelector(".thinking-block").outerHTML
+            : "";
+          body.innerHTML = tHead + renderMd(full, true);
+          body.classList.add("streaming-cursor");
+          lastRender = now;
+          if (now - lastHl > 800) {
+            highlight(body);
+            lastHl = now;
+          }
+          scrollToBottom();
         }
-        scrollToBottom();
       }
     };
     while (true) {
