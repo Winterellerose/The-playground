@@ -8,7 +8,13 @@ try {
   chats = [];
 }
 let activeChatId = localStorage.getItem("active_chat_id") || null;
-let customModels = JSON.parse(localStorage.getItem("pg_custom_models") || "[]");
+let customModels = [];
+try {
+  customModels = JSON.parse(localStorage.getItem("pg_custom_models") || "[]");
+  if (!Array.isArray(customModels)) customModels = [];
+} catch {
+  customModels = [];
+}
 let selectedModel = localStorage.getItem("selected_model");
 let isStreaming = false,
   abortCtrl = null,

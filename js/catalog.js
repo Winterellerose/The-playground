@@ -30,7 +30,7 @@ function applyCatalog(list) {
       apiId: mo.id,
       isFree: mo.free,
       intel: mo.free ? 3 : 4,
-      ctx: fmtCtx(mo.ctx || (r.local ? 8192 : 0)),
+      ctx: fmtCtx(mo.ctx || 0),
       vision: mo.vision,
       live: true,
       pricing: mo.pricing,

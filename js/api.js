@@ -119,7 +119,7 @@ function wireHist(hist, cfg) {
 }
 function cleanHistory(c, targetIdx) {
   let h = c.messages.slice(0, targetIdx).filter((x) => (x.role === "user" && ((x.content||"").trim() || (x.images&&x.images.length) || (x.files&&x.files.length))) || (x.role === "assistant" && ((x.content||"").trim() || (x.thinking||"").trim())));
-  const model = MODELS[c.model || selectedModel] || {}, raw = String(model.ctx || ""), ctx = Number(raw.replace(/[^0-9]/g, "")) * (/k/i.test(raw) ? 1000 : 1);
+  const model = MODELS[c.model || selectedModel] || {}, ctx = parseCtx(model.ctx);
   if (!ctx) h = h.slice(-60); else { const max=Math.max(1,(ctx-(parseInt($("maxTok").value)||8192))*.95); const tok=()=>h.reduce((n,x)=>n+Math.ceil(((x.content||"")+(x.thinking||"")).length/4),0); while(h.length>1 && tok()>max) h.shift(); if(h[0] && h[0].role === "assistant") h.shift(); }
   return h.map((x) => { const o={role:x.role,content:x.content||""}; if(x.role === "user" && x.images) o.images=x.images; if(x.role === "user" && x.files) o.files=x.files; return o; });
 }
