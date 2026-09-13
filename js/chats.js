@@ -246,6 +246,7 @@ function importedAlt(a) {
     sources: Array.isArray(a.sources)
       ? a.sources.map(importedSource).filter(Boolean).slice(0, 12)
       : undefined,
+    truncated: a.truncated === true || undefined,
   };
 }
 function importedMessage(m) {
@@ -267,6 +268,7 @@ function importedMessage(m) {
     const thinking = String(m.thinking || "").slice(0, MAX_IMPORT_TEXT);
     if (thinking) out.thinking = thinking;
     out.meta = importedMeta(m.meta);
+    if (m.truncated === true) out.truncated = true;
     const sources = Array.isArray(m.sources)
       ? m.sources.map(importedSource).filter(Boolean).slice(0, 12)
       : [];

@@ -2064,6 +2064,16 @@ header {
 .error-msg .btn-retry:hover {
   background: rgba(232, 154, 154, 0.12);
 }
+.truncated-note {
+  background: rgba(232, 179, 76, 0.08);
+  border: 1px solid rgba(232, 179, 76, 0.28);
+  color: #d9a441;
+  padding: 8px 13px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  margin: 4px 0;
+  font-family: var(--font-mono);
+}
 .msg-sources {
   display: flex;
   flex-wrap: wrap;
