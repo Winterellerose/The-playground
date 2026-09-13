@@ -2,8 +2,13 @@
 /* ═══ chats.js — chat CRUD, sidebar, per-chat prompts, import/export ═══ */
 
 /* ── Chats ── */
+let saveSeq = 0; // a newer saveChats() supersedes the deferred post-migration write
 function saveChats() {
-  const active=getActiveChat(); if(active) moveLargeImages(active).then(() => { try { localStorage.setItem("chat_history", JSON.stringify(chats)); } catch {} });
+  const active=getActiveChat();
+  if (active) {
+    const seq=++saveSeq;
+    moveLargeImages(active).then(() => { if (seq!==saveSeq) return; try { localStorage.setItem("chat_history", JSON.stringify(chats)); } catch {} });
+  }
   try {
     localStorage.setItem("chat_history", JSON.stringify(chats));
     return true;

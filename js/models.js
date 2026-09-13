@@ -304,6 +304,10 @@ function toggleThinking() {
 function updateUsageMeter() {
   const c=getActiveChat(), m=MODELS[selectedModel]||{}, ctx=parseCtx(m.ctx);
   const used=(c?.messages||[]).reduce((n,x)=>n+(x.meta&&Number(x.meta.in)+Number(x.meta.out)||Math.ceil(String(x.content||'').length/4)),0);
-  const cost=(c?.messages||[]).reduce((n,x)=>n+(x.meta&&REG[x.meta.p]&&REG[x.meta.p].metered ? 0 : 0),0);
-  const el=$("frameMeta"); if(el) el.textContent="— "+REG[m.provider]?.name?.toUpperCase()+" · "+m.badge?.toUpperCase()+" · "+(ctx?Math.round(used/1000)+"k / "+Math.round(ctx/1000)+"k":"est. —")+(REG[m.provider]?.type === "free" || REG[m.provider]?.local ? " · free" : " · est. cost");
+  // Live catalog entries carry per-token pricing; estimate from the model each
+  // answer actually used (rotation may differ from the selected one). Curated
+  // entries have no pricing data, so those chats show no $ tag instead of a fake one.
+  const cost=(c?.messages||[]).reduce((n,x)=>{ const pr=x.meta&&x.meta.m&&(Object.values(MODELS).find(v=>v.apiId===x.meta.m&&v.pricing)||{}).pricing; return pr?n+(Number(x.meta.in)||0)*(parseFloat(pr.prompt)||0)+(Number(x.meta.out)||0)*(parseFloat(pr.completion)||0):n; },0);
+  const tag=cost>0?" · ~$"+(cost<0.01?cost.toFixed(4):cost.toFixed(2)):REG[m.provider]?.type === "free" || REG[m.provider]?.local ? " · free" : "";
+  const el=$("frameMeta"); if(el) el.textContent="— "+REG[m.provider]?.name?.toUpperCase()+" · "+m.badge?.toUpperCase()+" · "+(ctx?Math.round(used/1000)+"k / "+Math.round(ctx/1000)+"k":"est. —")+tag;
 }
