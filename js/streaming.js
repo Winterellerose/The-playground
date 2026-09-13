@@ -107,7 +107,8 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
     t0 = performance.now();
   let pulse = null,
     block = null,
-    lastHl = 0;
+    lastHl = 0,
+    lastRender = 0;
 
   try {
     logRot(
@@ -252,18 +253,23 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
           pulse = null;
         }
         full += txt;
-        const tHead = body.querySelector(".thinking-block")
-          ? body.querySelector(".thinking-block").outerHTML
-          : "";
-        body.innerHTML = tHead + renderMd(full, true);
-        body.classList.add("streaming-cursor");
         body.dataset.raw = full;
         const now = performance.now();
-        if (now - lastHl > 800) {
-          highlight(body);
-          lastHl = now;
+        // A full parse+sanitize pass per chunk janks on fast streams; re-render
+        // at most every 120ms. The completion path always renders the final text.
+        if (now - lastRender >= 120) {
+          const tHead = body.querySelector(".thinking-block")
+            ? body.querySelector(".thinking-block").outerHTML
+            : "";
+          body.innerHTML = tHead + renderMd(full, true);
+          body.classList.add("streaming-cursor");
+          lastRender = now;
+          if (now - lastHl > 800) {
+            highlight(body);
+            lastHl = now;
+          }
+          scrollToBottom();
         }
-        scrollToBottom();
       }
     };
     while (true) {
