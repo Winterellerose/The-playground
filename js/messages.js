@@ -12,6 +12,8 @@ const PREV_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"/></svg>';
 const NEXT_SVG =
   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 6 15 12 9 18"/></svg>';
+const TRUNCATED_NOTE =
+  '<div class="truncated-note">⚠️ Response cut off — the model hit the max output tokens limit. Raise "Max output tokens" in Settings.</div>';
 function metaLine(meta) {
   if (!meta) return "";
   const ms = Number(meta.ms),
@@ -64,7 +66,7 @@ function addAssistantMsg(msg, idx) {
   const d = document.createElement("div");
   d.className = "msg assistant";
   d.dataset.idx = idx;
-  d.innerHTML = `<div class="msg-header"><span class="msg-role assistant">AI</span>${nav}${metaLine(alt.meta || msg.meta)}<div class="msg-actions"><span class="copied-toast">Copied</span><button data-act="copy-msg" title="Copy" aria-label="Copy message">${COPY_SVG}</button><button class="act-regen" data-act="regen" data-idx="${idx}" title="Regenerate" aria-label="Regenerate response">${REGEN_SVG}</button></div></div><div class="msg-body" data-raw="${esc(alt.content || "")}">${(alt.thinking ? thinkingHtml(alt.thinking) : "") + renderMd(alt.content || "")}</div>${sourcesHtml(alt.sources || msg.sources)}${followupsHtml(msg)}`;
+  d.innerHTML = `<div class="msg-header"><span class="msg-role assistant">AI</span>${nav}${metaLine(alt.meta || msg.meta)}<div class="msg-actions"><span class="copied-toast">Copied</span><button data-act="copy-msg" title="Copy" aria-label="Copy message">${COPY_SVG}</button><button class="act-regen" data-act="regen" data-idx="${idx}" title="Regenerate" aria-label="Regenerate response">${REGEN_SVG}</button></div></div><div class="msg-body" data-raw="${esc(alt.content || "")}">${(alt.thinking ? thinkingHtml(alt.thinking) : "") + renderMd(alt.content || "")}</div>${alt.truncated || msg.truncated ? TRUNCATED_NOTE : ""}${sourcesHtml(alt.sources || msg.sources)}${followupsHtml(msg)}`;
   chatWrap.appendChild(d);
   highlight(d);
 }
@@ -88,6 +90,7 @@ function switchAlt(idx, dir) {
   m.thinking = m.alts[ai].thinking;
   m.meta = m.alts[ai].meta;
   m.sources = m.alts[ai].sources;
+  m.truncated = !!m.alts[ai].truncated;
   saveChats();
   reloadUI();
 }

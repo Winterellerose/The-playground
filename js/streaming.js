@@ -103,6 +103,7 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
   let full = "",
     think = "",
     meta = null,
+    finish = null,
     t0 = performance.now();
   let pulse = null,
     block = null,
@@ -179,6 +180,92 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
     const reader = res.body.getReader(),
       dec = new TextDecoder();
     let buf = "";
+    const handleLine = (line) => {
+      const tr = line.trim();
+      if (!tr.startsWith("data:")) return;
+      const data = tr.slice(5).trim();
+      if (data === "[DONE]") return;
+      let evt;
+      try {
+        evt = JSON.parse(data);
+      } catch {
+        return;
+      }
+      if (evt.usage) {
+        meta = meta || {};
+        meta.out =
+          evt.usage.completion_tokens ?? evt.usage.output_tokens ?? meta.out;
+        meta.in =
+          evt.usage.prompt_tokens ?? evt.usage.input_tokens ?? meta.in;
+      }
+      if (evt.type === "message_delta" && evt.usage) {
+        meta = meta || {};
+        meta.out = evt.usage.output_tokens ?? meta.out;
+      }
+      if (evt.type === "message_delta" && evt.delta && evt.delta.stop_reason)
+        finish = evt.delta.stop_reason; // "end_turn" | "max_tokens" | …
+      let rc = null,
+        txt = null;
+      if (evt.type === "content_block_delta" && evt.delta) {
+        if (evt.delta.type === "thinking_delta") rc = evt.delta.thinking;
+        else if (evt.delta.type === "text_delta") txt = evt.delta.text;
+      } else {
+        if (evt.choices && evt.choices[0] && evt.choices[0].finish_reason)
+          finish = evt.choices[0].finish_reason; // "stop" | "length" | …
+        const d = evt.choices && evt.choices[0] && evt.choices[0].delta;
+        if (!d) return;
+        rc =
+          typeof d.reasoning_content === "string"
+            ? d.reasoning_content
+            : typeof d.reasoning === "string"
+              ? d.reasoning
+              : null;
+        txt = d.content || null;
+      }
+      if (rc) {
+        if (!pulse) {
+          pulse = document.createElement("div");
+          pulse.className = "thinking-pulse";
+          pulse.innerHTML =
+            '<span>Thinking</span><span class="dots"><span></span><span></span><span></span></span>';
+          body.insertBefore(pulse, body.firstChild);
+        }
+        think += rc;
+        if (think.length > 10 && !block) {
+          pulse.remove();
+          pulse = null;
+          body.insertAdjacentHTML("afterbegin", thinkingHtml(think));
+          block = body.querySelector(".thinking-block");
+        }
+        if (block) {
+          const tc = block.querySelector(".thinking-content");
+          tc.textContent = think;
+          block.querySelector(".preview").textContent = think
+            .slice(0, 120)
+            .replace(/\n/g, " ");
+          tc.scrollTop = tc.scrollHeight;
+        }
+      }
+      if (txt) {
+        if (pulse) {
+          pulse.remove();
+          pulse = null;
+        }
+        full += txt;
+        const tHead = body.querySelector(".thinking-block")
+          ? body.querySelector(".thinking-block").outerHTML
+          : "";
+        body.innerHTML = tHead + renderMd(full, true);
+        body.classList.add("streaming-cursor");
+        body.dataset.raw = full;
+        const now = performance.now();
+        if (now - lastHl > 800) {
+          highlight(body);
+          lastHl = now;
+        }
+        scrollToBottom();
+      }
+    };
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
@@ -191,89 +278,12 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
       buf += dec.decode(value, { stream: true });
       const lines = buf.split("\n");
       buf = lines.pop() || "";
-      for (const line of lines) {
-        const tr = line.trim();
-        if (!tr.startsWith("data:")) continue;
-        const data = tr.slice(5).trim();
-        if (data === "[DONE]") continue;
-        let evt;
-        try {
-          evt = JSON.parse(data);
-        } catch {
-          continue;
-        }
-        if (evt.usage) {
-          meta = meta || {};
-          meta.out =
-            evt.usage.completion_tokens ?? evt.usage.output_tokens ?? meta.out;
-          meta.in =
-            evt.usage.prompt_tokens ?? evt.usage.input_tokens ?? meta.in;
-        }
-        if (evt.type === "message_delta" && evt.usage) {
-          meta = meta || {};
-          meta.out = evt.usage.output_tokens ?? meta.out;
-        }
-        let rc = null,
-          txt = null;
-        if (evt.type === "content_block_delta" && evt.delta) {
-          if (evt.delta.type === "thinking_delta") rc = evt.delta.thinking;
-          else if (evt.delta.type === "text_delta") txt = evt.delta.text;
-        } else {
-          const d = evt.choices && evt.choices[0] && evt.choices[0].delta;
-          if (!d) continue;
-          rc =
-            typeof d.reasoning_content === "string"
-              ? d.reasoning_content
-              : typeof d.reasoning === "string"
-                ? d.reasoning
-                : null;
-          txt = d.content || null;
-        }
-        if (rc) {
-          if (!pulse) {
-            pulse = document.createElement("div");
-            pulse.className = "thinking-pulse";
-            pulse.innerHTML =
-              '<span>Thinking</span><span class="dots"><span></span><span></span><span></span></span>';
-            body.insertBefore(pulse, body.firstChild);
-          }
-          think += rc;
-          if (think.length > 10 && !block) {
-            pulse.remove();
-            pulse = null;
-            body.insertAdjacentHTML("afterbegin", thinkingHtml(think));
-            block = body.querySelector(".thinking-block");
-          }
-          if (block) {
-            const tc = block.querySelector(".thinking-content");
-            tc.textContent = think;
-            block.querySelector(".preview").textContent = think
-              .slice(0, 120)
-              .replace(/\n/g, " ");
-            tc.scrollTop = tc.scrollHeight;
-          }
-        }
-        if (txt) {
-          if (pulse) {
-            pulse.remove();
-            pulse = null;
-          }
-          full += txt;
-          const tHead = body.querySelector(".thinking-block")
-            ? body.querySelector(".thinking-block").outerHTML
-            : "";
-          body.innerHTML = tHead + renderMd(full, true);
-          body.classList.add("streaming-cursor");
-          body.dataset.raw = full;
-          const now = performance.now();
-          if (now - lastHl > 800) {
-            highlight(body);
-            lastHl = now;
-          }
-          scrollToBottom();
-        }
-      }
+      for (const line of lines) handleLine(line);
     }
+    // Final flush: the last SSE line can arrive without a trailing newline and
+    // TextDecoder can still hold a split multi-byte character — drop neither.
+    buf += dec.decode();
+    if (buf) buf.split("\n").forEach(handleLine);
   } catch (e) {
     if (gen !== streamGen) {
       // A user Stop aborts the in-flight fetch. Keep what streamed so far
@@ -310,6 +320,13 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
   }
   body.classList.remove("streaming-cursor");
   const ms = performance.now() - t0;
+  const truncated =
+    (finish === "length" || finish === "max_tokens") && !!(full || think);
+  if (finish === "length" || finish === "max_tokens")
+    logRot(
+      `⚠️ ${REG[pid].name} hit the max output tokens limit — answer cut off. Raise "Max output tokens" in Settings`,
+      "warn",
+    );
   if (full || think) {
     meta = meta || {};
     meta.p = pid;
@@ -322,6 +339,16 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
       ? body.querySelector(".thinking-block").outerHTML
       : "";
     body.innerHTML = tHead + renderMd(full);
+    if (truncated) {
+      const note = document.createElement("div");
+      note.className = "truncated-note";
+      note.textContent =
+        "⚠️ " +
+        (cfg.thinking && m.thinking === true && !m.adaptive
+          ? "Response cut off — the thinking budget and the answer share the same max output tokens limit. Raise it in Settings."
+          : "Response cut off — the model hit the max output tokens limit. Raise it in Settings.");
+      body.appendChild(note);
+    }
     body.dataset.raw = full;
     highlight(body);
   }
@@ -330,6 +357,7 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
     thinking: think || undefined,
     meta: full || think ? meta : null,
     sources: cfg.webSources,
+    truncated,
   };
 }
 
@@ -388,12 +416,14 @@ async function runCompletion(c, regenIdx) {
         thinking: result.thinking,
         meta: result.meta,
         sources: result.sources,
+        truncated: result.truncated || false,
       });
       m.activeAlt = m.alts.length - 1;
       m.content = result.content;
       m.thinking = result.thinking;
       m.meta = result.meta;
       m.sources = result.sources;
+      m.truncated = result.truncated || false;
       delete m.followups; // regenerate chips for the new answer
       asstIdx = idx;
     } else {
@@ -404,6 +434,7 @@ async function runCompletion(c, regenIdx) {
         meta: result.meta,
         sources: result.sources,
         stopped: result.stopped || false,
+        truncated: result.truncated || false,
       });
       asstIdx = c.messages.length - 1;
     }
