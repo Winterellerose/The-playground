@@ -20,6 +20,13 @@ function fmtFileSize(n) {
   if (n < 1024 * 1024) return (n / 1024).toFixed(n < 10 * 1024 ? 1 : 0) + " KB";
   return (n / 1048576).toFixed(2) + " MB";
 }
+function parseCtx(v) {
+  // "262K" → 262000 · "1.3M" → 1300000 · "131000" → 131000 · garbage → 0
+  const m = /([\d.]+)\s*([kKmM])?/.exec(String(v || ""));
+  if (!m) return 0;
+  const n = parseFloat(m[1]) || 0;
+  return Math.round(n * (m[2] ? (/m/i.test(m[2]) ? 1e6 : 1e3) : 1));
+}
 function nowStamp() {
   try {
     return new Date().toLocaleString(undefined, {

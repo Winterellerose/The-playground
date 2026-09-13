@@ -302,7 +302,7 @@ function toggleThinking() {
   syncToggle(t);
 }
 function updateUsageMeter() {
-  const c=getActiveChat(), m=MODELS[selectedModel]||{}, ctx=Number(String(m.ctx||'').replace(/[^0-9]/g,''))*(/k/i.test(String(m.ctx||''))?1000:1);
+  const c=getActiveChat(), m=MODELS[selectedModel]||{}, ctx=parseCtx(m.ctx);
   const used=(c?.messages||[]).reduce((n,x)=>n+(x.meta&&Number(x.meta.in)+Number(x.meta.out)||Math.ceil(String(x.content||'').length/4)),0);
   const cost=(c?.messages||[]).reduce((n,x)=>n+(x.meta&&REG[x.meta.p]&&REG[x.meta.p].metered ? 0 : 0),0);
   const el=$("frameMeta"); if(el) el.textContent="— "+REG[m.provider]?.name?.toUpperCase()+" · "+m.badge?.toUpperCase()+" · "+(ctx?Math.round(used/1000)+"k / "+Math.round(ctx/1000)+"k":"est. —")+(REG[m.provider]?.type === "free" || REG[m.provider]?.local ? " · free" : " · est. cost");
