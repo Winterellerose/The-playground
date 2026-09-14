@@ -127,9 +127,9 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
       try {
         em = JSON.parse(et).error?.message || em;
       } catch {}
-      if (res.status === 402)
-        em =
-          "that model needs OpenRouter credits; pick a FREE model (web search itself is free)";
+      // 402 = the account has no credits for this id. Provider-accurate copy
+      // lives in rotation.js so it can be unit-tested.
+      if (res.status === 402) em = creditWallMessage(pid, cfg.modelId);
       const retriable =
         res.status === 429 ||
         res.status >= 500 ||

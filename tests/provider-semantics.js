@@ -13,7 +13,7 @@
 const fs = require("fs");
 const path = require("path");
 
-const SRC = ["config", "state", "utils", "catalog", "keys", "rotation"]
+const SRC = ["config", "state", "utils", "catalog", "keys", "rotation", "models", "extras"]
   .map((f) => fs.readFileSync(path.join(__dirname, "..", "js", f + ".js"), "utf8"))
   .join("\n");
 /* Test-only export tail: `let selectedModel` is module-private, so expose a setter. */
@@ -21,9 +21,15 @@ const TAIL = `
 return {
   REG, MODELS, rotState, FALLBACK_ID,
   keyTestOutcome, testKey, keyRow, relayBase, relayUrl, relayNeeded,
-  nativeIdUsable, parseNativeModels, applyNativeCatalog,
-  avail, canServe, orHosts, idFor,
-  __set: (k, v) => { if (k === "selectedModel") selectedModel = v; },
+  nativeIdUsable, parseNativeModels, applyNativeCatalog, applyCatalog,
+  avail, canServe, orHosts, orIsFree, orCatalogHas, idFor,
+  substituteOk, candidatesFor, servingPid, providerBlockNote, getCfg,
+  creditWallMessage, metaCandidates,
+  detectProviderForId, customModelVerify, addCustomModel, selectModel,
+  updateUsageMeter, CUSTOM_PROV_KEY, lastCustomProv, renderModelPicker,
+  __set: (k, v) => { if (k === "selectedModel") selectedModel = v;
+                     if (k === "customModels") customModels = v; },
+  __get: (k) => (k === "customModels" ? customModels : undefined),
 };`;
 
 const mkEl = () => ({
@@ -44,6 +50,9 @@ const mkEl = () => ({
     (this.__kids = this.__kids || []).shift();
   },
   setAttribute() {},
+  removeAttribute() {},
+  focus() {},
+  setSelectionRange() {},
   querySelector: () => null,
   querySelectorAll: () => [],
 });
@@ -66,11 +75,18 @@ function run(store = {}, opts = {}) {
   const fetch = opts.fetch || (async () => {
     throw new TypeError("Failed to fetch");
   });
+  /* models.js/extras.js are in the bundle now (their function declarations
+     shadow these stubs); the stubs cover only what those modules call OUTSIDE
+     the bundle — attachments, modals and chat plumbing. */
   const api = new Function(
     "window", "localStorage", "document", "fetch",
     "regroupModels", "renderModelPicker", "selectModel",
+    "chatSysText", "setAttachUI", "closeModelPicker", "getActiveChat",
+    "saveChats", "renderSidebar", "renderFollowups", "webNeedsSearch",
     '"use strict";\n' + SRC + TAIL,
-  )({}, localStorage, document, fetch, () => {}, () => {}, () => {});
+  )({}, localStorage, document, fetch, () => {}, () => {}, () => {},
+     () => "", () => {}, () => {}, () => null,
+     () => {}, () => {}, () => {}, () => false);
   api.__els = els;
   // Everything the app logged through logRot(), read back out of the fake DOM
   // (a getter, because the log is written by the calls the test makes later).
@@ -228,6 +244,174 @@ async function main() {
     yes(/data-relay="nvidia"/.test(c.keyRow("nvidia", "NVIDIA NIM", "nvapi-…")), "NVIDIA row carries the relay field");
     yes(/CORS/.test(c.keyRow("nvidia", "NVIDIA NIM", "nvapi-…")), "…and explains why");
     eq(/data-relay/.test(c.keyRow("groq", "Groq", "gsk_…")), false, "other rows stay one-line");
+  }
+
+
+  /* ── 8. a FREE model is never re-routed onto a metered route ─────── */
+  console.log("free models stay off metered routes");
+  {
+    // The reported bug: a model registered under NVIDIA NIM, an OpenRouter key
+    // on hand, and OpenRouter listing the same id as a PAID model. NVIDIA is
+    // unreachable without a CORS relay, so the request used to go to OpenRouter
+    // and come back as "that model needs OpenRouter credits".
+    const cat = { ts: 1, models: [
+      { id: "meta/llama-3.3-70b-instruct", name: "Llama 3.3 70B", free: false },
+      { id: "nvidia/nemotron-3-ultra-550b-a55b:free", name: "Nemotron 3 Ultra", free: true },
+    ] };
+    const c = run({ pg_or_catalog_v1: JSON.stringify(cat) },
+      { els: { keyORFree: { value: "sk-or-x" }, keyNvidia: { value: "nvapi-x" } } });
+    const m = c.MODELS["nv-llama33"];
+    eq(m.provider, "nvidia", "the curated NVIDIA model belongs to NVIDIA");
+    yes(c.orHosts(m.apiId), "OpenRouter does list that id…");
+    eq(c.orIsFree(m.apiId), false, "…but as a metered model, not a free one");
+    eq(c.substituteOk("openrouter", m), false, "so a FREE model is not substituted onto it");
+    c.__set("selectedModel", "nv-llama33");
+    const cfg = c.getCfg();
+    eq(cfg.pid, undefined, "no OpenRouter request is built");
+    yes(/NVIDIA NIM/.test(cfg.error || ""), "the error names the model's real provider");
+    yes(/CORS relay/.test(cfg.error || ""), "…and says the CORS relay is what's missing");
+    yes(/NOT re-routed to OpenRouter/.test(cfg.error || ""), "…and says the substitution was refused on purpose");
+
+    // The same id, listed as FREE on OpenRouter: a legitimate fallback.
+    const freeCat = { ts: 1, models: [{ id: "meta/llama-3.3-70b-instruct", name: "Llama 3.3 70B", free: true }] };
+    const f = run({ pg_or_catalog_v1: JSON.stringify(freeCat) }, { els: { keyORFree: { value: "sk-or-x" } } });
+    eq(f.substituteOk("openrouter", f.MODELS["nv-llama33"]), true, "a free id on OpenRouter is still an allowed fallback");
+    f.__set("selectedModel", "nv-llama33");
+    eq(f.getCfg().pid, "openrouter", "…and the request goes there");
+    eq(f.getCfg().modelId, "meta/llama-3.3-70b-instruct", "…with the same id, not a stand-in");
+    yes(seen(f, /not used — routing via OpenRouter/), "…and the log says NVIDIA wasn't the one used");
+
+    // With a relay the model never leaves NVIDIA.
+    const r = run({ pg_relay_nvidia: "http://localhost:8765", pg_or_catalog_v1: JSON.stringify(cat) },
+      { els: { keyORFree: { value: "sk-or-x" }, keyNvidia: { value: "nvapi-x" } } });
+    r.__set("selectedModel", "nv-llama33");
+    eq(r.getCfg().pid, "nvidia", "with a relay configured the model stays on NVIDIA");
+    eq(r.servingPid(r.MODELS["nv-llama33"]), "nvidia", "and the header agrees with the request");
+
+    // No catalog loaded: nothing may be sent to OpenRouter, and the app must
+    // not claim OpenRouter would charge without the catalog to prove it.
+    const g = run({}, { els: { keyORFree: { value: "sk-or-x" } } });
+    g.__set("selectedModel", "nv-llama33");
+    eq(g.getCfg().pid, undefined, "with no catalog loaded nothing is sent to OpenRouter either");
+    eq(/NOT re-routed/.test(g.getCfg().error || ""), false,
+      "…and it doesn't assert a credit wall it can't verify");
+    yes(/CORS relay/.test(g.getCfg().error || ""), "the relay is still named as the fix");
+
+    // Paid models may still route anywhere they are hosted.
+    yes(c.substituteOk("openrouter", { provider: "nvidia", apiId: "meta/llama-3.3-70b-instruct", isFree: false }),
+      "a PREMIUM model may use a metered route");
+  }
+
+  /* ── 9. the header names the provider that will actually answer ──── */
+  console.log("header honesty");
+  {
+    const freeCat = { ts: 1, models: [{ id: "meta/llama-3.3-70b-instruct", free: true }] };
+    const c = run({ pg_or_catalog_v1: JSON.stringify(freeCat) }, { els: { keyORFree: { value: "sk-or-x" } } });
+    c.selectModel("nv-llama33");
+    yes(/NVIDIA NIM → OPENROUTER/.test(c.__els.frameMeta.textContent),
+      "the header shows NVIDIA NIM → OpenRouter, not just NVIDIA NIM");
+    yes(/free/.test(c.__els.frameMeta.textContent), "…and still reads free");
+
+    const blocked = run({}, { els: { keyORFree: { value: "sk-or-x" } } });
+    blocked.selectModel("nv-dsv4f");
+    yes(seen(blocked, /NVIDIA NIM sends no CORS headers/),
+      "picking an unreachable model warns at pick time, not after a failed send");
+  }
+
+  /* ── 10. titles/follow-ups obey the same rule ───────────────────── */
+  console.log("extras routing");
+  {
+    const cat = { ts: 1, models: [{ id: "meta/llama-3.3-70b-instruct", free: false }] };
+    const c = run({ pg_or_catalog_v1: JSON.stringify(cat) },
+      { els: { keyORFree: { value: "sk-or-x" }, keyNvidia: { value: "nvapi-x" } } });
+    eq(c.metaCandidates(c.MODELS["nv-llama33"]), [],
+      "titles/follow-ups are not generated by a metered route");
+    const freeCat = { ts: 1, models: [{ id: "nvidia/nemotron-3-ultra-550b-a55b:free", free: true }] };
+    const f = run({ pg_or_catalog_v1: JSON.stringify(freeCat) }, { els: { keyORFree: { value: "sk-or-x" } } });
+    eq(f.metaCandidates(f.MODELS["nem-u"]), ["openrouter"],
+      "…but a genuinely free id still gets its chips");
+  }
+
+  /* ── 11. the 402 copy names the provider that sent it ───────────── */
+  console.log("402 copy");
+  {
+    const c = run();
+    yes(/OpenRouter/.test(c.creditWallMessage("openrouter", "meta/x")), "an OpenRouter 402 mentions OpenRouter");
+    yes(/FREE/.test(c.creditWallMessage("openrouter_paid", "meta/x")), "…and points at the free tier");
+    const nv = c.creditWallMessage("nvidia", "meta/llama-3.3-70b-instruct");
+    yes(/NVIDIA NIM/.test(nv), "a NVIDIA 402 says NVIDIA");
+    eq(/OpenRouter/.test(nv), false, "…and never blames OpenRouter for it");
+  }
+
+  /* ── 12. a custom model can't be saved as OpenRouter's ──────────── */
+  console.log("custom model provider honesty");
+  {
+    const store = {
+      pg_native_catalog_v1: JSON.stringify({ ts: 1, byPid: { nvidia: { ts: 1, models: [
+        { id: "meta/llama-3.1-70b-instruct", name: "meta/llama-3.1-70b-instruct", context_length: 131072 },
+      ] } } }),
+      pg_or_catalog_v1: JSON.stringify({ ts: 1, models: [{ id: "nvidia/nemotron-3-ultra-550b-a55b:free", free: true }] }),
+      pg_relay_nvidia: "http://localhost:8765",
+    };
+    const c = run(store, { els: {
+      keyNvidia: { value: "nvapi-x" },
+      cmProv: { value: "openrouter" },            // the dropdown's default
+      cmId: { value: "meta/llama-3.1-70b-instruct" },
+    } });
+    eq(c.detectProviderForId("meta/llama-3.1-70b-instruct"), "nvidia", "the live NVIDIA list identifies its own id");
+    eq(c.orCatalogHas("meta/llama-3.1-70b-instruct"), false, "OpenRouter's catalog does not list it");
+    eq(c.orCatalogHas("nope/unknown"), false, "…and says so for any id it lacks");
+    eq(run().orCatalogHas("nope/unknown"), null, "with no catalog loaded the answer is unknown, not no");
+
+    c.addCustomModel();
+    eq(c.__get("customModels").length, 1, "the model was added");
+    eq(c.__get("customModels")[0].provider, "nvidia", "…under NVIDIA, not the dropdown's OpenRouter default");
+    eq(JSON.parse(store.pg_custom_models)[0].provider, "nvidia", "and that is what gets persisted");
+    eq(store[c.CUSTOM_PROV_KEY], "nvidia", "the dropdown remembers the provider for next time");
+    yes(seen(c, /Provider corrected to NVIDIA NIM/), "the correction is announced, not silent");
+
+    c.__set("selectedModel", c.__get("customModels")[0].id);
+    const cfg = c.getCfg();
+    eq(cfg.pid, "nvidia", "the saved custom model chats through NVIDIA");
+    eq(cfg.modelId, "meta/llama-3.1-70b-instruct", "…with its own id");
+
+    // An id nobody's list knows still gets rejected with a useful reason.
+    const d = run(store, { els: { cmProv: { value: "openrouter" }, cmId: { value: "acme/not-a-real-model" } } });
+    const v = d.customModelVerify("openrouter", "acme/not-a-real-model");
+    yes(/isn't in the OpenRouter catalog/.test(v.err || ""), "an unknown id is still rejected");
+  }
+
+  /* ── 13. the add form defaults to the last provider used ────────── */
+  console.log("custom model form");
+  {
+    const c = run({ pg_custom_prov: "nvidia" });
+    eq(c.lastCustomProv(), "nvidia", "the last provider used is remembered");
+    c.renderModelPicker();
+    yes(/<option value="nvidia" selected>/.test(c.__els.mpBody.innerHTML), "…and preselected in the form");
+    eq(run().lastCustomProv(), "openrouter", "a first add still defaults to OpenRouter");
+    eq(run({ pg_custom_prov: "not-a-provider" }).lastCustomProv(), "openrouter", "a stale saved provider is ignored");
+  }
+
+
+  /* ── 14. the live catalog can't re-price another provider's model ── */
+  console.log("catalog reconciliation vs. price");
+  {
+    const c = run();
+    eq(c.MODELS["nv-llama33"].isFree, true, "the curated NVIDIA model starts out free");
+    c.applyCatalog([
+      { id: "meta/llama-3.3-70b-instruct", name: "Llama 3.3 70B", ctx: 128000, free: false, vision: false },
+      { id: "nvidia/nemotron-3-ultra-550b-a55b:free", name: "Nemotron 3 Ultra", ctx: 1000000, free: true },
+    ]);
+    eq(c.MODELS["nv-llama33"].isFree, true,
+      "OpenRouter charging for a cross-listed id does not re-price NVIDIA's own model");
+    eq(c.MODELS["nv-llama33"].verified, true, "…but it is still verified against the catalog");
+    eq(c.MODELS["nv-llama33"].ctx, "128K", "…and its context length is still corrected");
+    eq(c.substituteOk("openrouter", c.MODELS["nv-llama33"]), false,
+      "so it is still not substituted onto that metered route");
+
+    const d = run();
+    d.applyCatalog([{ id: "nvidia/nemotron-3-ultra-550b-a55b:free", name: "Nemotron 3 Ultra", free: false }]);
+    eq(d.MODELS["nem-u"].isFree, false, "an OpenRouter-served id that turns paid IS re-priced");
   }
 
   if (fails) {
