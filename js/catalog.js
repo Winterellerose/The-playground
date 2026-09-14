@@ -88,6 +88,10 @@ function applyCatalog(list) {
   }
   regroupModels();
   if (stranded && MODELS[selectedModel]) selectModel(selectedModel, false);
+  // The catalog just changed — customs may now resolve ids they couldn't
+  // before. Guarded typeof: models.js isn't part of the test bundle.
+  if (typeof enrichCustomModelsFromCatalogs === "function")
+    enrichCustomModelsFromCatalogs();
 }
 async function refreshCatalog(force) {
   let c = null;
@@ -227,6 +231,9 @@ function applyNativeCatalog(pid, list) {
     );
     regroupModels();
   }
+  // New native rows may unlock metadata for saved custom models.
+  if (typeof enrichCustomModelsFromCatalogs === "function")
+    enrichCustomModelsFromCatalogs();
 }
 async function refreshNativeCatalogs() {
   let cached = null;
@@ -280,4 +287,7 @@ async function refreshNativeCatalogs() {
       JSON.stringify({ ts: Date.now(), byPid: results }),
     );
   } catch {}
+  // Final pass: pick up anything the per-provider applies above missed.
+  if (typeof enrichCustomModelsFromCatalogs === "function")
+    enrichCustomModelsFromCatalogs();
 }

@@ -860,6 +860,14 @@ header {
 .mp-custom-add input {
   flex: 1;
 }
+.mp-custom-hint {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  color: var(--text-faint);
+  letter-spacing: 0.06em;
+  margin: 0 2px 10px;
+  padding: 0 6px;
+}
 .btn-acc {
   background: var(--text);
   color: var(--bg);

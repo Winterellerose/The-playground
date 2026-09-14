@@ -2,7 +2,21 @@
 
 "use strict";
 /* ════════════════════════════════════════════════════════════
-   THE PLAYGROUND v3.0.1 — multi-provider AI studio (single file)
+   THE PLAYGROUND v3.0.2 — multi-provider AI studio (single file)
+   v3.0.2: custom models stop being second-class. A hand-added model
+   used to register with ctx "—", no vision/thinking flags, no tags
+   and a generated description — because only id/provider/apiId/name
+   were ever saved. Now every custom entry is enriched against the
+   catalogs: exact-id and bare/suffix lookup across curated + live
+   or:/nat: rows, the cached OpenRouter list and every native /models
+   cache, with id-signal fallbacks (vision: *_vl/llava/pixtral/…;
+   thinking: r1/qwq/gemini-3/…; adaptive: opus-5, gpt-5.5, …) when no
+   catalog knows it yet. Enrichment re-runs after every catalog
+   refresh so customs upgrade in place, persists its results (ctx,
+   vision, thinking, adaptive, intel, params, desc, pricing) and only
+   ever upgrades a stale false to true. Picker cards gain a 🧠 tag,
+   search covers the description, and the hero/thinking toggle behave
+   like curated models (adaptive shows on + disabled).
    v3.0.1: NVIDIA NIM truth-in-advertising. Their API sends no
    Access-Control-Allow-Origin, so the browser — not the key — rejected every
    direct call: the Test button showed a red "Fail" for a perfectly good

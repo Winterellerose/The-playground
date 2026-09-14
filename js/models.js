@@ -1,9 +1,190 @@
 "use strict";
 /* ═══ models.js — model picker + custom models ═══ */
 
+/* ── Custom-model enrichment ──────────────────────────────────────
+   A hand-added model only knows its provider + apiId. Everything
+   else (context window, vision, thinking, params, pricing) lives in
+   the catalogs — curated entries, the cached OpenRouter/native model
+   lists, and the live or:/nat: picker rows. findMetaInCatalogs()
+   digs that metadata out so custom cards stop showing ctx "—" with
+   no tags, and enrichCustomModelsFromCatalogs() re-runs the lookup
+   after every catalog refresh so saved customs upgrade in place. */
+function catalogMetaOf(m) {
+  return {
+    name: m.name,
+    ctx: m.ctx,
+    vision: m.vision,
+    thinking: m.thinking,
+    adaptive: m.adaptive,
+    intel: m.intel,
+    params: m.params,
+    desc: m.desc,
+    pricing: m.pricing || null,
+  };
+}
+function findMetaInCatalogs(prov, apiId) {
+  // Search order: exact id among registered models (curated + live
+  // or:/nat: rows), bare/suffix match there, OpenRouter cache, this
+  // provider's native cache, then every native cache.
+  const orProv = prov === "openrouter" || prov === "openrouter_paid";
+  const sameFam = (m) =>
+    orProv
+      ? m.provider === "openrouter" || m.provider === "openrouter_paid"
+      : m.provider === prov;
+  const bare = String(apiId).split("/").pop().toLowerCase();
+  let hit = Object.values(MODELS).find(
+    (m) => !m.custom && m.apiId === apiId && sameFam(m),
+  );
+  // Bare/suffix match ("anthropic/claude-sonnet-5" ↔ curated
+  // "claude-sonnet-5"): prefer the same provider family, then accept a
+  // cross-family entry when at least one side is a bare id — the metadata
+  // describes the same underlying model whichever host serves it. Both
+  // sides vendor-prefixed means host-specific ids, so those never cross.
+  if (!hit)
+    hit = Object.values(MODELS).find(
+      (m) =>
+        !m.custom &&
+        m.apiId &&
+        m.apiId.split("/").pop().toLowerCase() === bare &&
+        sameFam(m),
+    );
+  if (!hit)
+    hit = Object.values(MODELS).find(
+      (m) =>
+        !m.custom &&
+        m.apiId &&
+        m.apiId.split("/").pop().toLowerCase() === bare &&
+        (!String(apiId).includes("/") || !m.apiId.includes("/")),
+    );
+  if (hit) {
+    const meta = catalogMetaOf(hit);
+    // Curated entries carry hand-written metadata but no pricing; the
+    // OpenRouter cache does. Top the hit up so the cost meter works.
+    if (!meta.pricing && orProv) {
+      try {
+        const c = JSON.parse(localStorage.getItem(OR_CAT_KEY) || "null");
+        const mo =
+          c && Array.isArray(c.models)
+            ? c.models.find((m) => m.id === apiId)
+            : null;
+        if (mo && mo.pricing) meta.pricing = mo.pricing;
+      } catch {}
+    }
+    return meta;
+  }
+  if (orProv) {
+    try {
+      const c = JSON.parse(localStorage.getItem(OR_CAT_KEY) || "null");
+      const mo =
+        c && Array.isArray(c.models)
+          ? c.models.find((m) => m.id === apiId)
+          : null;
+      if (mo)
+        return {
+          name: mo.name,
+          ctx: fmtCtx(mo.ctx || 0),
+          vision: !!mo.vision,
+          desc: mo.desc,
+          pricing: mo.pricing || null,
+        };
+    } catch {}
+  }
+  const fromNativeList = (list) => {
+    if (!Array.isArray(list) || !list.length) return null;
+    const mo =
+      list.find((m) => m.id === apiId) ||
+      list.find((m) => m.id && m.id.split("/").pop().toLowerCase() === bare);
+    return mo
+      ? {
+          name: mo.name,
+          ctx: fmtCtx(mo.ctx || 0),
+          vision: !!mo.vision,
+          desc: mo.desc,
+        }
+      : null;
+  };
+  try {
+    const c = JSON.parse(localStorage.getItem(NATIVE_CAT_KEY) || "null");
+    const byPid = (c && c.byPid) || {};
+    if (!orProv) {
+      const meta = fromNativeList(byPid[prov] && byPid[prov].models);
+      if (meta) return meta;
+    }
+    for (const pid of Object.keys(byPid)) {
+      const meta = fromNativeList(byPid[pid] && byPid[pid].models);
+      if (meta) return meta;
+    }
+  } catch {}
+  return null;
+}
+function inferVisionFromId(apiId) {
+  // Strong signals only — a wrong "vision" promise breaks image sends.
+  return /vision|multimodal|_vl\b|-vl\b|\/vl\b|llava|pixtral/i.test(
+    String(apiId || ""),
+  );
+}
+function inferThinkingFromId(apiId, desc) {
+  const id = String(apiId || "").toLowerCase();
+  if (/thinking|reason(er|ing)/i.test(id + " " + String(desc || "")))
+    return true;
+  return /deepseek-r1|deepseek-v4|qwq|\bo1\b|\bo3\b|\bo4\b|glm-5|gemini-3|claude-5/.test(
+    id,
+  );
+}
+function inferAdaptiveFromId(apiId) {
+  // Models whose reasoning is always on / self-budgeted — the toggle
+  // renders on + disabled for these, same as the curated entries.
+  return /claude-(opus|sonnet|haiku|fable)-5|opus-4-8|gpt-5\.5|gemini-3\.8-flash|glm-5\.3/i.test(
+    String(apiId || ""),
+  );
+}
+function mergeFlag(saved, catalog, inferred) {
+  // true beats false beats unknown: enrichment only ever upgrades a
+  // stale save when better info arrives, it never downgrades a true.
+  if (saved === true || catalog === true || inferred === true) return true;
+  if (saved === false || catalog === false) return false;
+  return undefined;
+}
+function enrichCustomModelEntry(cm) {
+  const meta = findMetaInCatalogs(cm.provider, cm.apiId) || {};
+  if (typeof cm.ctx === "number") cm.ctx = fmtCtx(cm.ctx);
+  if (meta.ctx && meta.ctx !== "—") cm.ctx = meta.ctx;
+  if (!cm.ctx) cm.ctx = "—";
+  const catalogDesc = meta.desc || "";
+  cm.vision = mergeFlag(cm.vision, meta.vision, inferVisionFromId(cm.apiId));
+  cm.adaptive = mergeFlag(
+    cm.adaptive,
+    meta.adaptive,
+    inferAdaptiveFromId(cm.apiId),
+  );
+  cm.thinking = mergeFlag(
+    cm.thinking,
+    meta.thinking,
+    inferThinkingFromId(cm.apiId, catalogDesc),
+  );
+  if (cm.adaptive === true) cm.thinking = true; // adaptive implies thinking
+  if (meta.params) cm.params = meta.params;
+  if (meta.pricing) cm.pricing = meta.pricing;
+  // Prefer the catalog's real description over the generated placeholder.
+  if (catalogDesc && (!cm.desc || /^custom model\./i.test(cm.desc)))
+    cm.desc = catalogDesc;
+  // Upgrade the auto-derived display name when a catalog knows a nicer one.
+  const derived =
+    !cm.name ||
+    cm.name === cm.apiId ||
+    String(cm.apiId).split("/").pop().toLowerCase().startsWith(cm.name.toLowerCase());
+  if (meta.name && derived) cm.name = String(meta.name).slice(0, 40);
+  cm.intel =
+    Math.max(
+      cm.intel || 0,
+      meta.intel || 0,
+      cm.adaptive === true ? 5 : cm.thinking === true ? 4 : 0,
+    ) || 3;
+}
 function loadCustomModels() {
   customModels.forEach((cm) => {
     if (cm && cm.id && cm.apiId && REG[cm.provider]) {
+      enrichCustomModelEntry(cm); // ctx/vision/thinking/… from the catalogs
       MODELS[cm.id] = {
         name: cm.name || cm.apiId,
         badge: (cm.name || cm.apiId).slice(0, 7).toUpperCase(),
@@ -11,19 +192,59 @@ function loadCustomModels() {
         provider: cm.provider,
         apiId: cm.apiId,
         isFree: REG[cm.provider].type === "free",
-        intel: 3,
+        intel: cm.intel || 3,
         ctx: cm.ctx || "—",
-        desc: "Custom model. " + REG[cm.provider].name + " · " + cm.apiId,
+        vision: cm.vision === true,
+        thinking: cm.thinking === true,
+        adaptive: cm.adaptive === true,
+        params: cm.params,
+        pricing: cm.pricing || null,
+        desc:
+          cm.desc || "Custom model. " + REG[cm.provider].name + " · " + cm.apiId,
         custom: true,
       };
     }
   });
 }
 function saveCustomModels() {
+  // Persist the enriched fields too, so a reload before any catalog is
+  // available still shows real ctx/vision/thinking instead of blanks.
   localStorage.setItem(
     "pg_custom_models",
-    JSON.stringify(customModels.filter((c) => MODELS[c.id]?.custom === true)),
+    JSON.stringify(
+      customModels
+        .filter((c) => MODELS[c.id]?.custom === true)
+        .map((c) => ({
+          id: c.id,
+          provider: c.provider,
+          apiId: c.apiId,
+          name: c.name,
+          ctx: c.ctx,
+          vision: c.vision,
+          thinking: c.thinking,
+          adaptive: c.adaptive,
+          intel: c.intel,
+          params: c.params,
+          desc: c.desc,
+          pricing: c.pricing || null,
+        })),
+    ),
   );
+}
+function enrichCustomModelsFromCatalogs() {
+  // Hooked after every catalog apply/refresh: customs resolve against
+  // whatever the catalogs know *now*, upgrading in place over time.
+  if (!customModels.length) return;
+  const before = JSON.stringify(customModels);
+  customModels.forEach((cm) => {
+    if (cm && cm.id && cm.apiId && REG[cm.provider]) enrichCustomModelEntry(cm);
+  });
+  if (JSON.stringify(customModels) === before) return;
+  loadCustomModels();
+  saveCustomModels();
+  regroupModels();
+  if ($("mpOverlay")?.classList.contains("open")) renderModelPicker(true);
+  if (MODELS[selectedModel]?.custom) selectModel(selectedModel, false);
 }
 function customModelVerify(prov, apiId) {
   // Validate a hand-entered id against whatever live model list we have on hand.
@@ -145,6 +366,7 @@ function mpCardHtml(id, m) {
     m.ctx && m.ctx !== "—" ? m.ctx : null,
     m.params,
     m.vision ? "👁 vision" : null,
+    m.adaptive ? "🧠 adaptive" : m.thinking ? "🧠 thinking" : null,
   ]
     .filter(Boolean)
     .map((t) => `<span class="mp-tag">${t}</span>`)
@@ -155,7 +377,7 @@ function mpCardHtml(id, m) {
   const del = m.custom
     ? `<button class="sb-del" style="opacity:1;position:static;font-size:20px;line-height:1;padding:2px 8px;align-self:center" data-act="remove-custom" data-id="${esc(id)}" title="Remove this custom model" aria-label="Remove custom model ${esc(m.name)}">×</button>`
     : "";
-  return `<div class="mp-card${id === selectedModel ? " selected" : ""}" data-mid="${id}" data-name="${esc(((m.name || "") + " " + (m.apiId || "") + " " + (m.provider || "")).toLowerCase())}" tabindex="0" role="button" aria-pressed="${id === selectedModel ? "true" : "false"}"><div class="mp-card-top"><span class="mp-card-name">${esc(m.name)} ${priceTag}</span>${del}<span class="intel-dots">${dots}</span></div>${tags ? `<div class="mp-card-tags">${tags}</div>` : ""}<div class="mp-card-desc">${esc(m.desc || "")}</div></div>`;
+  return `<div class="mp-card${id === selectedModel ? " selected" : ""}" data-mid="${id}" data-name="${esc(((m.name || "") + " " + (m.apiId || "") + " " + (m.provider || "") + " " + (m.desc || "")).toLowerCase())}" tabindex="0" role="button" aria-pressed="${id === selectedModel ? "true" : "false"}"><div class="mp-card-top"><span class="mp-card-name">${esc(m.name)} ${priceTag}</span>${del}<span class="intel-dots">${dots}</span></div>${tags ? `<div class="mp-card-tags">${tags}</div>` : ""}<div class="mp-card-desc">${esc(m.desc || "")}</div></div>`;
 }
 function sortModels(arr) {
   // Featured first by intel, then alphabetical; selected model always on top.
@@ -251,7 +473,8 @@ function renderModelPicker() {
       )
       .join(
         "",
-      )}</select><input id="cmId" placeholder="vendor/model-id (e.g. anthropic/claude-opus-5)" spellcheck="false" aria-label="Model ID"><button class="btn-acc" data-act="add-custom">Add</button></div>`;
+      )}</select><input id="cmId" placeholder="vendor/model-id (e.g. anthropic/claude-opus-5)" spellcheck="false" aria-label="Model ID"><button class="btn-acc" data-act="add-custom">Add</button></div>` +
+    `<div class="mp-custom-hint">Custom models auto-enrich ctx, vision and thinking from the live catalogs.</div>`;
   // Restore filter state and focus the search box.
   if (mpQuery) mpFilter(mpQuery);
   setTimeout(() => {
