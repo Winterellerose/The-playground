@@ -2,7 +2,23 @@
 
 "use strict";
 /* ════════════════════════════════════════════════════════════
-   THE PLAYGROUND v3.0.0 — multi-provider AI studio (single file)
+   THE PLAYGROUND v3.0.1 — multi-provider AI studio (single file)
+   v3.0.1: NVIDIA NIM truth-in-advertising. Their API sends no
+   Access-Control-Allow-Origin, so the browser — not the key — rejected every
+   direct call: the Test button showed a red "Fail" for a perfectly good
+   nvapi- key, the live /models list silently stayed empty, and chats died in
+   the stream catch. Test now reports "Unverified" for a request that never
+   completed and reserves Fail for a real 401/403; NVIDIA is skipped by
+   rotation unless a local CORS relay is configured (Settings → NVIDIA →
+   relay, e.g. http://localhost:8765), and the relay is what chats, the key
+   test and the catalog all go through when present. Also fixed: native model
+   lists dropped every vendor/-prefixed id, which threw away NVIDIA's entire
+   catalog (REG[].namespaced opts back in), OpenRouter fallbacks are now
+   checked against the live catalog so a guaranteed 404 isn't attempted, and
+   the stale built docs/ copy of sw.js (still v3 while the source was v4) is
+   regenerated with the shell cache bumped to playground-v5 — which is what
+   CI's "Built artifact is in sync" step had been failing on.
+   Unit checks: tests/provider-semantics.js (npm test).
    v3.0.0: PWA/offline shell; Ollama + LM Studio local models; full-text chat search; keyboard shortcuts and voice input; context/cost estimates; IndexedDB large-image storage; token-aware history; CI, Pages and model audit; stale duplicate tree removed and README added.
    v2.9.4: sticky scroll — auto-scroll pauses when you scroll up to reread during a stream; a ↓ Latest pill returns to the newest message. Sending, regenerating or switching chats re-engages the chase.
    v2.9.3: accessibility — every icon-only control carries a real
@@ -159,6 +175,17 @@ const REG = {
     models: "https://integrate.api.nvidia.com/v1/models",
     style: "none",
     rpm: "40 RPM",
+    /* noCors: integrate.api.nvidia.com answers with no Access-Control-Allow-
+       Origin on any path (key test, /models and chat alike) and offers no
+       Anthropic-style browser opt-in, so the browser — not NVIDIA — rejects
+       the call. A key that works with curl always "failed" the old Test
+       button. The provider is therefore only used when a local CORS relay is
+       configured (Settings → NVIDIA → relay); otherwise rotation routes its
+       models elsewhere.
+       namespaced: NVIDIA ids are `vendor/model` like OpenRouter's, so the live
+       /models catalog must not strip them as OpenRouter-only noise. */
+    noCors: true,
+    namespaced: true,
   },
   deepseek: {
     name: "DeepSeek",

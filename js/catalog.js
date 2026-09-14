@@ -145,6 +145,16 @@ async function refreshCatalog(force) {
    load and hourly — no manual edits required. */
 const NATIVE_CAT_TTL = 3600e3,
   NATIVE_CAT_KEY = "pg_native_catalog_v1";
+/* Which ids from a provider's own /models list may enter the picker.
+   Most native APIs use bare ids and vendor/-prefixed ones are OpenRouter's
+   noise — but not all of them: NVIDIA (namespaced in REG) only ever returns
+   `meta/llama-3.3-70b-instruct`-style ids, so the old blanket slash filter
+   silently discarded NVIDIA's entire catalog. */
+function nativeIdUsable(pid, id) {
+  const r = REG[pid] || {};
+  if (!String(id || "").includes("/")) return true;
+  return pid === "openrouter" || pid === "openrouter_paid" || !!r.namespaced;
+}
 function parseNativeModels(pid, data) {
   let arr = Array.isArray(data) ? data : data.data || data.models || [];
   const out = [];
@@ -187,13 +197,7 @@ function applyNativeCatalog(pid, list) {
   let added = 0;
   for (const mo of list) {
     if (!mo.id || known.has(mo.id)) continue;
-    // Native APIs use bare ids (no vendor/ prefix); vendor/ ids come from OR.
-    if (
-      pid !== "openrouter" &&
-      pid !== "openrouter_paid" &&
-      mo.id.includes("/")
-    )
-      continue;
+    if (!nativeIdUsable(pid, mo.id)) continue;
     const k = "nat:" + pid + ":" + mo.id;
     if (MODELS[k]) continue;
     MODELS[k] = {
@@ -212,7 +216,7 @@ function applyNativeCatalog(pid, list) {
     };
     added++;
   }
-  const idset = new Set(list.map((x) => x.id));
+  const idset = new Set(list.filter((x) => nativeIdUsable(pid, x.id)).map((x) => x.id));
   Object.values(MODELS).forEach((m) => {
     if (m.provider === pid && !m.live && idset.has(m.apiId)) m.verified = true;
   });
@@ -238,6 +242,9 @@ async function refreshNativeCatalogs() {
   const jobs = Object.keys(REG).map(async (pid) => {
     const r = REG[pid];
     if (!r.models || pid === "openrouter" || pid === "openrouter_paid") return;
+    // A provider with no CORS headers can only be reached through a relay;
+    // without one, the request would just die in the console as "Failed to fetch".
+    if (relayNeeded(pid)) return;
     if (freshAll && results[pid] && Array.isArray(results[pid].models)) {
       applyNativeCatalog(pid, results[pid].models);
       return;
@@ -252,7 +259,7 @@ async function refreshNativeCatalogs() {
         headers["x-api-key"] = key;
         headers["anthropic-version"] = "2023-06-01";
       } else if (!r.local) headers["Authorization"] = "Bearer " + key;
-      const res = await fetch(r.models, { headers, signal: ac.signal });
+      const res = await fetch(relayUrl(pid, r.models), { headers, signal: ac.signal });
       if (!res.ok) return;
       const data = await res.json();
       const models = parseNativeModels(pid, data);

@@ -115,7 +115,7 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
       `→ ${REG[pid].name} · ${cfg.modelId}${cfg.webSources && cfg.webSources.length ? " · 🌐 web" : ""}`,
       "ok",
     );
-    const res = await fetch(REG[pid].url, {
+    const res = await fetch(relayUrl(pid, REG[pid].url), {
       method: "POST",
       headers: h,
       body: JSON.stringify(rb),
@@ -305,13 +305,21 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
       return { content: "", thinking: "", meta: null, aborted: true };
     }
     if (e.name !== "AbortError") {
-      showError(e.message, () => {
+      let em = e.message;
+      // With a relay configured, a dead fetch means the relay is down — the
+      // provider call itself never happens from here.
+      if (
+        relayBase(pid) &&
+        /failed to fetch|load failed|networkerror/i.test(String(em || ""))
+      )
+        em = `${REG[pid].name}: the CORS relay at ${relayBase(pid)} didn't answer — is it running?`;
+      showError(em, () => {
         if (gen === streamGen) {
           msgDiv.remove();
           runCompletion(c, regenIdx);
         }
       });
-      logRot(`Error: ${e.message}`, "err");
+      logRot(`Error: ${em}`, "err");
     }
   }
   if (gen !== streamGen) {
