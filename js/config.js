@@ -2,7 +2,29 @@
 
 "use strict";
 /* ════════════════════════════════════════════════════════════
-   THE PLAYGROUND v3.0.2 — multi-provider AI studio (single file)
+   THE PLAYGROUND v3.0.3 — multi-provider AI studio (single file)
+   v3.0.3: a model stays with the provider you gave it. A custom model was
+   saved under the provider dropdown's default (OpenRouter) unless you
+   remembered to change it, and even one correctly saved under NVIDIA NIM was
+   silently re-routed to OpenRouter whenever NVIDIA was unreachable (no CORS
+   relay) and OpenRouter happened to list the same id — where that id is a
+   metered model, so the reply came back as "that model needs OpenRouter
+   credits; pick a FREE model" for a model the user never pointed at
+   OpenRouter. Now a model the picker labels FREE is never substituted onto a
+   metered route (substituteOk() checks the id against the live OpenRouter
+   catalog, not just its vendor/model shape, and both OpenRouter entries share
+   one balance so only the id decides), the refusal is explained instead of
+   attempted, 402 copy names the provider that actually sent it
+   (creditWallMessage), titles/follow-ups obey the same rule, custom-model
+   adds detect the provider from the live /models lists and remember the last
+   choice, picking an unreachable model warns at pick time rather than after a
+   failed send, and the frame header shows the provider that will really
+   answer ("NVIDIA NIM → OPENROUTER") instead of the one on the model card.
+   Related: OpenRouter's price for a cross-listed id no longer re-prices a
+   model another provider serves free — applyCatalog re-prices only entries
+   OpenRouter actually hosts, since price is a property of the host.
+   Shell cache bumped to playground-v6. Unit checks:
+   tests/provider-semantics.js sections 8–13 (npm test).
    v3.0.2: custom models stop being second-class. A hand-added model
    used to register with ctx "—", no vision/thinking flags, no tags
    and a generated description — because only id/provider/apiId/name

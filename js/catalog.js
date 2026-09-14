@@ -62,7 +62,12 @@ function applyCatalog(list) {
       m.provider === "openrouter" || m.provider === "openrouter_paid";
     const real = realMap.get(m.apiId);
     if (real) {
-      m.isFree = isFreeOf(real);
+      // Price is a property of the HOST, not of the model. OpenRouter charging
+      // for `meta/llama-3.3-70b-instruct` says nothing about what NVIDIA
+      // charges for it, so only OpenRouter-served entries are re-priced —
+      // otherwise a cross-listed native model flips to "paid", stops being
+      // offered its free fallbacks, and the picker lies about the cost.
+      if (onOR) m.isFree = isFreeOf(real);
       const realCtx = real.ctx || real.context_length;
       if (realCtx) m.ctx = fmtCtx(realCtx);
       if (

@@ -1,6 +1,18 @@
 "use strict";
 /* ═══ models.js — model picker + custom models ═══ */
 
+/* Provider the custom-model form was last used with, so adding a second NVIDIA
+   model doesn't mean picking NVIDIA out of the dropdown all over again (and so
+   it doesn't silently default back to OpenRouter either). */
+const CUSTOM_PROV_KEY = "pg_custom_prov";
+function lastCustomProv() {
+  let p = "";
+  try {
+    p = localStorage.getItem(CUSTOM_PROV_KEY) || "";
+  } catch {}
+  return REG[p] ? p : "openrouter";
+}
+
 /* ── Custom-model enrichment ──────────────────────────────────────
    A hand-added model only knows its provider + apiId. Everything
    else (context window, vision, thinking, params, pricing) lives in
@@ -246,6 +258,29 @@ function enrichCustomModelsFromCatalogs() {
   if ($("mpOverlay")?.classList.contains("open")) renderModelPicker(true);
   if (MODELS[selectedModel]?.custom) selectModel(selectedModel, false);
 }
+/* Which provider actually owns this exact id, per the live lists on hand.
+   The custom-model provider dropdown defaults to OpenRouter, so an NVIDIA id
+   typed into the box used to be SAVED as an OpenRouter model — and then every
+   request went to OpenRouter, no NVIDIA key involved. Returns null when the
+   lists don't settle it, in which case the dropdown wins. */
+function detectProviderForId(apiId) {
+  const hits = new Set();
+  try {
+    const c = JSON.parse(localStorage.getItem(NATIVE_CAT_KEY) || "null");
+    const byPid = (c && c.byPid) || {};
+    Object.keys(byPid).forEach((pid) => {
+      const l = byPid[pid] && byPid[pid].models;
+      if (Array.isArray(l) && l.some((mo) => mo && mo.id === apiId)) hits.add(pid);
+    });
+  } catch {}
+  // Curated and already-registered live rows count too — NVIDIA's /models list
+  // only loads through a CORS relay, but its curated ids are known regardless.
+  Object.values(MODELS).forEach((m) => {
+    if (!m.custom && m.apiId === apiId && REG[m.provider]) hits.add(m.provider);
+  });
+  const own = [...hits].filter((p) => !OR_STYLE.includes(p));
+  return own.length === 1 ? own[0] : null;
+}
 function customModelVerify(prov, apiId) {
   // Validate a hand-entered id against whatever live model list we have on hand.
   // Returns 'ok' | {warn} (list unavailable — allow, but say so) | {err} (known-bad id).
@@ -286,17 +321,26 @@ function customModelVerify(prov, apiId) {
         "'s model list isn't loaded yet, so this couldn't be verified — remove it with × if chats fail.",
     };
   if (ids.includes(apiId)) return "ok";
+  const owner = detectProviderForId(apiId);
   return {
     err:
       '"' +
       apiId +
       "\" isn't in " +
       src +
-      ". Check the ID (OpenRouter needs vendor/model, e.g. anthropic/claude-opus-5) and try again.",
+      "." +
+      (owner && owner !== prov
+        ? " That id belongs to " +
+          REG[owner].name +
+          " — switch the provider dropdown to " +
+          REG[owner].name +
+          " and add it again."
+        : " Check the ID (OpenRouter needs vendor/model, e.g. anthropic/claude-opus-5) and try again."),
   };
 }
 function addCustomModel() {
-  const prov = $("cmProv").value,
+  const chosenProv = $("cmProv").value;
+  let prov = chosenProv,
     idRaw = $("cmId").value.trim();
   if (!idRaw) return logRot("Custom model: enter an ID", "warn");
   if (/\s/.test(idRaw))
@@ -308,9 +352,18 @@ function addCustomModel() {
       "Custom model: IDs may only contain letters, digits, and . - _ : /",
       "warn",
     );
+  const orPair = (p) => p === "openrouter" || p === "openrouter_paid";
+  // The provider dropdown defaults to OpenRouter and most people never touch
+  // it, so NVIDIA/Groq/… ids used to be registered as OpenRouter models and
+  // then sent to OpenRouter for the rest of their life. When a live list says
+  // the id belongs to exactly one other provider — and OpenRouter's own
+  // catalog does NOT list it — trust the list and say so out loud.
+  const owner = detectProviderForId(idRaw);
+  const corrected =
+    owner && orPair(prov) && orCatalogHas(idRaw) !== true ? owner : prov;
+  if (corrected !== prov) prov = corrected;
   if (customModels.some((c) => c.provider === prov && c.apiId === idRaw))
     return logRot("Custom model: you already added this one", "warn");
-  const orPair = (p) => p === "openrouter" || p === "openrouter_paid";
   const dupe = Object.values(MODELS).find(
     (m) =>
       !m.custom &&
@@ -337,6 +390,9 @@ function addCustomModel() {
   });
   loadCustomModels();
   saveCustomModels(); // register first, THEN persist — the old order dropped the newest add
+  try {
+    localStorage.setItem(CUSTOM_PROV_KEY, prov); // remember the choice for next time
+  } catch {}
   $("cmId").value = "";
   renderModelPicker(true);
   selectModel(id, true);
@@ -346,6 +402,11 @@ function addCustomModel() {
       : "Custom model added (unverified): " + idRaw + " — " + v.warn,
     v === "ok" ? "ok" : "warn",
   );
+  if (prov !== chosenProv)
+    logRot(
+      `Provider corrected to ${REG[prov].name} — that id isn't on OpenRouter, so requests won't be sent there.`,
+      "warn",
+    );
 }
 function removeCustom(id, ev) {
   if (ev) ev.stopPropagation();
@@ -469,12 +530,12 @@ function renderModelPicker() {
     )
       .map(
         ([pid, r]) =>
-          `<option value="${pid}"${pid === "openrouter" ? " selected" : ""}>${r.name}</option>`,
+          `<option value="${pid}"${pid === lastCustomProv() ? " selected" : ""}>${r.name}</option>`,
       )
       .join(
         "",
       )}</select><input id="cmId" placeholder="vendor/model-id (e.g. anthropic/claude-opus-5)" spellcheck="false" aria-label="Model ID"><button class="btn-acc" data-act="add-custom">Add</button></div>` +
-    `<div class="mp-custom-hint">Custom models auto-enrich ctx, vision and thinking from the live catalogs.</div>`;
+    `<div class="mp-custom-hint">Pick the provider that actually serves the ID — a model saved under OpenRouter is called on OpenRouter. ctx, vision and thinking auto-enrich from the live catalogs.</div>`;
   // Restore filter state and focus the search box.
   if (mpQuery) mpFilter(mpQuery);
   setTimeout(() => {
@@ -509,6 +570,13 @@ function selectModel(id, close) {
   pill.className = "status-pill " + (m.isFree ? "free" : "paid");
   pill.innerHTML = `<span class="dot"></span>${m.isFree ? "Free" : "Paid"}`;
   setAttachUI();
+  // Say it at pick time, not after a failed send: a model whose provider this
+  // page can't reach (NVIDIA NIM without a CORS relay, a missing key) used to
+  // look perfectly usable until the request failed — or quietly left for
+  // OpenRouter and came back with a 402 credit wall. getCfg() logs the
+  // substitution itself when a legitimate fallback exists.
+  const probe = getCfg();
+  if (probe.error) logRot(`${m.name}: ${probe.error}`, "warn");
   if (close) closeModelPicker();
 }
 function syncToggle(t) {
@@ -531,6 +599,14 @@ function updateUsageMeter() {
   // answer actually used (rotation may differ from the selected one). Curated
   // entries have no pricing data, so those chats show no $ tag instead of a fake one.
   const cost=(c?.messages||[]).reduce((n,x)=>{ const pr=x.meta&&x.meta.m&&(Object.values(MODELS).find(v=>v.apiId===x.meta.m&&v.pricing)||{}).pricing; return pr?n+(Number(x.meta.in)||0)*(parseFloat(pr.prompt)||0)+(Number(x.meta.out)||0)*(parseFloat(pr.completion)||0):n; },0);
-  const tag=cost>0?" · ~$"+(cost<0.01?cost.toFixed(4):cost.toFixed(2)):REG[m.provider]?.type === "free" || REG[m.provider]?.local ? " · free" : "";
-  const el=$("frameMeta"); if(el) el.textContent="— "+REG[m.provider]?.name?.toUpperCase()+" · "+m.badge?.toUpperCase()+" · "+(ctx?Math.round(used/1000)+"k / "+Math.round(ctx/1000)+"k":"est. —")+tag;
+  // Truth in advertising: the header names the provider that will ACTUALLY
+  // answer. A model registered under NVIDIA NIM that ends up routed elsewhere
+  // used to keep saying "NVIDIA NIM" while the request went to OpenRouter.
+  const via=m.provider&&REG[m.provider]?servingPid(m):null;
+  const rp=REG[via||m.provider]||{};
+  const prov=via&&via!==m.provider
+    ? REG[m.provider].name.toUpperCase()+" → "+REG[via].name.toUpperCase()
+    : (REG[m.provider]?.name?.toUpperCase()||"");
+  const tag=cost>0?" · ~$"+(cost<0.01?cost.toFixed(4):cost.toFixed(2)):rp.type === "free" || rp.local ? " · free" : "";
+  const el=$("frameMeta"); if(el) el.textContent="— "+prov+" · "+m.badge?.toUpperCase()+" · "+(ctx?Math.round(used/1000)+"k / "+Math.round(ctx/1000)+"k":"est. —")+tag;
 }

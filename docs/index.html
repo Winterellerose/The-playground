@@ -3836,7 +3836,7 @@ html { scrollbar-width: thin; scrollbar-color: #2d2d29 transparent; }
     <div class="landing-label">Initializing</div>
     <h1 class="landing-title">The <em>playground.</em></h1>
     <div class="landing-bar"><div class="landing-bar-fill"></div></div>
-    <div class="landing-meta"><span>Preparing studio</span><span>v3.0.2</span></div>
+    <div class="landing-meta"><span>Preparing studio</span><span>v3.0.3</span></div>
     <div class="landing-enter">Press to enter</div>
   </div>
 </div>
@@ -4013,7 +4013,29 @@ html { scrollbar-width: thin; scrollbar-color: #2d2d29 transparent; }
 
 "use strict";
 /* ════════════════════════════════════════════════════════════
-   THE PLAYGROUND v3.0.2 — multi-provider AI studio (single file)
+   THE PLAYGROUND v3.0.3 — multi-provider AI studio (single file)
+   v3.0.3: a model stays with the provider you gave it. A custom model was
+   saved under the provider dropdown's default (OpenRouter) unless you
+   remembered to change it, and even one correctly saved under NVIDIA NIM was
+   silently re-routed to OpenRouter whenever NVIDIA was unreachable (no CORS
+   relay) and OpenRouter happened to list the same id — where that id is a
+   metered model, so the reply came back as "that model needs OpenRouter
+   credits; pick a FREE model" for a model the user never pointed at
+   OpenRouter. Now a model the picker labels FREE is never substituted onto a
+   metered route (substituteOk() checks the id against the live OpenRouter
+   catalog, not just its vendor/model shape, and both OpenRouter entries share
+   one balance so only the id decides), the refusal is explained instead of
+   attempted, 402 copy names the provider that actually sent it
+   (creditWallMessage), titles/follow-ups obey the same rule, custom-model
+   adds detect the provider from the live /models lists and remember the last
+   choice, picking an unreachable model warns at pick time rather than after a
+   failed send, and the frame header shows the provider that will really
+   answer ("NVIDIA NIM → OPENROUTER") instead of the one on the model card.
+   Related: OpenRouter's price for a cross-listed id no longer re-prices a
+   model another provider serves free — applyCatalog re-prices only entries
+   OpenRouter actually hosts, since price is a property of the host.
+   Shell cache bumped to playground-v6. Unit checks:
+   tests/provider-semantics.js sections 8–13 (npm test).
    v3.0.2: custom models stop being second-class. A hand-added model
    used to register with ctx "—", no vision/thinking flags, no tags
    and a generated description — because only id/provider/apiId/name
@@ -5578,7 +5600,12 @@ function applyCatalog(list) {
       m.provider === "openrouter" || m.provider === "openrouter_paid";
     const real = realMap.get(m.apiId);
     if (real) {
-      m.isFree = isFreeOf(real);
+      // Price is a property of the HOST, not of the model. OpenRouter charging
+      // for `meta/llama-3.3-70b-instruct` says nothing about what NVIDIA
+      // charges for it, so only OpenRouter-served entries are re-priced —
+      // otherwise a cross-listed native model flips to "paid", stops being
+      // offered its free fallbacks, and the picker lies about the cost.
+      if (onOR) m.isFree = isFreeOf(real);
       const realCtx = real.ctx || real.context_length;
       if (realCtx) m.ctx = fmtCtx(realCtx);
       if (
@@ -6117,24 +6144,89 @@ function canServe(pid, m) {
   if (OR_STYLE.includes(pid) && orHosts(m.apiId)) return true;
   return false;
 }
+/* Is this id FREE *on OpenRouter*? Both OpenRouter entries share one endpoint
+   and one account balance, so "openrouter" vs "openrouter_paid" says which key
+   is used — not whether the request costs credits. Only the id does: `:free`
+   suffixes, or the live catalog's own pricing. Unknown is treated as paid,
+   because promising free and returning 402 is the worse failure. */
+function orIsFree(id) {
+  if (/:free$/i.test(String(id || ""))) return true;
+  try {
+    const c = JSON.parse(localStorage.getItem(OR_CAT_KEY) || "null");
+    const mo =
+      c && Array.isArray(c.models) ? c.models.find((x) => x.id === id) : null;
+    if (mo) return mo.free === true;
+  } catch {}
+  return false;
+}
+/* Exact OpenRouter catalog membership, without orHosts()'s id-shape guess.
+   Returns null when no catalog is loaded — callers must treat "unknown" as
+   unknown rather than as "not on OpenRouter". */
+function orCatalogHas(id) {
+  try {
+    const c = JSON.parse(localStorage.getItem(OR_CAT_KEY) || "null");
+    if (c && Array.isArray(c.models) && c.models.length)
+      return c.models.some((mo) => mo.id === id);
+  } catch {}
+  return null;
+}
+/* The 402 copy, provider-accurate. It used to blame OpenRouter no matter which
+   provider sent the 402 — which is how a custom NVIDIA model that had quietly
+   been re-routed told its user to "pick a FREE model" on a service they had
+   never chosen. */
+function creditWallMessage(pid, modelId) {
+  return OR_STYLE.includes(pid)
+    ? `OpenRouter has no credits for "${modelId}" — that id is metered there. Pick a model marked FREE, or add credits at openrouter.ai. (Web search itself is free.)`
+    : `${(REG[pid] || {}).name || pid} rejected "${modelId}" with 402 — that account is out of credits/quota.`;
+}
+/* canServe() answers "could this provider answer the request at all".
+   substituteOk() answers "may we quietly use it instead of the model's own
+   provider". A model the picker labels FREE must never be re-routed onto a
+   metered route — that is exactly how a custom NVIDIA model turned into
+   "that model needs OpenRouter credits": NVIDIA was unreachable, OpenRouter
+   happened to list the same id as a paid model, and the request went there
+   anyway. Refuse the substitution and explain instead. */
+function substituteOk(pid, m) {
+  if (pid === m.provider) return true;
+  if (!canServe(pid, m)) return false;
+  if (!m.isFree) return true; // paid models may route anywhere they're hosted
+  if (OR_STYLE.includes(pid)) return orIsFree(m.apiId);
+  return REG[pid].type === "free";
+}
+/* Why the model's OWN provider isn't usable — the sentence the user actually
+   needs, instead of a request sent somewhere else to fail. */
+function providerBlockNote(m) {
+  const p = m.provider,
+    r = REG[p] || {};
+  if (!r.name || r.local) return "";
+  if (relayNeeded(p))
+    return `${r.name} sends no CORS headers, so this page can only reach it through a local relay — add one in Settings → ${r.name} → CORS relay`;
+  const s = rotState[p];
+  if (s && s.bad) return `${r.name} rejected its API key — re-test it in Settings`;
+  if (!getKey(p)) return `add your ${r.name} key in Settings`;
+  if (s && s.backoffUntil && Date.now() < s.backoffUntil)
+    return `${r.name} is rate-limited right now`;
+  return "";
+}
 function idFor(pid, m) {
   if (pid === m.provider) return m.apiId;
   if (OR_STYLE.includes(pid) && orHosts(m.apiId)) return m.apiId;
   return FALLBACK_ID[pid] || m.apiId;
 }
-function getCfg(excludedPids = []) {
-  const m = MODELS[selectedModel];
-  if (!m) return { error: "Select a model." };
+/* Every provider that may serve this exact model, best first. Shared by
+   getCfg() (chat) and servingPid() (what the header advertises), so the UI
+   can never claim a provider the request won't actually use. */
+function candidatesFor(m, excludedPids = []) {
   const pool = REG[m.provider].type === "free" ? FREE_PIDS : PAID_PIDS;
   const excluded = new Set(excludedPids || []);
-  let cands = [];
+  const cands = [];
   const push = (pid) => {
     if (
       !excluded.has(pid) &&
       !cands.includes(pid) &&
       (REG[pid].local || getKey(pid)) &&
       avail(pid) &&
-      canServe(pid, m)
+      substituteOk(pid, m)
     )
       cands.push(pid);
   };
@@ -6142,23 +6234,64 @@ function getCfg(excludedPids = []) {
   if (!REG[m.provider].local) OR_STYLE.forEach(push); // same exact id via OpenRouter
   if (!REG[m.provider].local) pool.forEach(push); // provider-native fallback models
   if (!REG[m.provider].local) [...PAID_PIDS, ...FREE_PIDS].filter((p) => !REG[p].local).forEach(push); // last resort
+  return cands;
+}
+/* Which provider will actually answer, or null. Logging-free on purpose: it's
+   called on every header repaint. */
+function servingPid(m) {
+  const c = candidatesFor(m);
+  return c.length ? c[0] : null;
+}
+function getCfg(excludedPids = []) {
+  const m = MODELS[selectedModel];
+  if (!m) return { error: "Select a model." };
+  const excluded = new Set(excludedPids || []);
+  const cands = candidatesFor(m, excludedPids);
   if (!cands.length) {
-    // There ARE providers for this model, but every key is missing/bad/limited.
+    // There ARE providers for this model, but every key is missing/bad/limited
+    // — or the only route left would cost credits the user didn't agree to.
     const haveKey = KEY_DEFS.some(([pid]) => getKey(pid)) || Object.values(REG).some((r) => r.local);
     if (!haveKey)
       return {
         error:
           "No API keys configured. Open Settings and add at least one free key (OpenRouter recommended).",
       };
+    const own = providerBlockNote(m);
+    // A metered provider that COULD have served the exact id, which we refused
+    // on purpose because the model is free. Name it rather than letting the
+    // request fail with a bare 402.
+    const paidRoute = OR_STYLE.find(
+      (p) =>
+        !excluded.has(p) &&
+        REG[p].type !== "free" &&
+        getKey(p) &&
+        avail(p) &&
+        canServe(p, m),
+    );
+    // Only claim this when the catalog actually says so: orHosts() falls back
+    // to an id-shape guess, and "OpenRouter would charge you" is not something
+    // to assert on a guess.
+    const orPaidId =
+      !paidRoute &&
+      m.isFree &&
+      orCatalogHas(m.apiId) === true &&
+      !orIsFree(m.apiId) &&
+      OR_STYLE.find((p) => !excluded.has(p) && getKey(p) && avail(p));
+    if (m.isFree && (paidRoute || orPaidId))
+      return {
+        error: `"${m.name}" is a FREE ${REG[m.provider].name} model, so it was NOT re-routed to OpenRouter — that route bills credits and answers 402 when the account has none. ${
+          own ? "Fix: " + own + "." : ""
+        } Or pick a model marked PREMIUM if you mean to spend credits.`,
+      };
+    if (own)
+      return {
+        error: `"${m.name}" is served by ${REG[m.provider].name} — ${own}.`,
+      };
     const canHost = Object.keys(REG).filter((p) => canServe(p, m));
     const missing = canHost.filter((p) => !REG[p].local && !getKey(p));
     if (missing.length)
       return {
         error: `"${m.name}" needs ${missing.map((p) => REG[p].name).join(" or ")} — add that key in Settings, or pick a model you have a key for.`,
-      };
-    if (REG[m.provider].noCors)
-      return {
-        error: `"${m.name}" is served by ${REG[m.provider].name}, whose API sends no CORS headers — a browser can't call it directly. Add a local relay for it in Settings (or pick a model another provider hosts).`,
       };
     return {
       error: `All providers for "${m.name}" are rate-limited or rejected the request. Free tiers can be busy — wait a moment, pick another free model, or add a paid key.`,
@@ -6168,7 +6301,7 @@ function getCfg(excludedPids = []) {
     prov = REG[pid];
   if (pid !== m.provider)
     logRot(
-      `Routing ${m.badge || m.apiId} via ${prov.name} → ${idFor(pid, m)}`,
+      `${m.badge || m.apiId}: ${REG[m.provider].name} not used — routing via ${prov.name} → ${idFor(pid, m)}`,
       prov.type === "free" ? "ok" : "warn",
     );
   return {
@@ -6189,6 +6322,18 @@ function getCfg(excludedPids = []) {
 /* ═══ js/models.js ═══ */
 "use strict";
 /* ═══ models.js — model picker + custom models ═══ */
+
+/* Provider the custom-model form was last used with, so adding a second NVIDIA
+   model doesn't mean picking NVIDIA out of the dropdown all over again (and so
+   it doesn't silently default back to OpenRouter either). */
+const CUSTOM_PROV_KEY = "pg_custom_prov";
+function lastCustomProv() {
+  let p = "";
+  try {
+    p = localStorage.getItem(CUSTOM_PROV_KEY) || "";
+  } catch {}
+  return REG[p] ? p : "openrouter";
+}
 
 /* ── Custom-model enrichment ──────────────────────────────────────
    A hand-added model only knows its provider + apiId. Everything
@@ -6435,6 +6580,29 @@ function enrichCustomModelsFromCatalogs() {
   if ($("mpOverlay")?.classList.contains("open")) renderModelPicker(true);
   if (MODELS[selectedModel]?.custom) selectModel(selectedModel, false);
 }
+/* Which provider actually owns this exact id, per the live lists on hand.
+   The custom-model provider dropdown defaults to OpenRouter, so an NVIDIA id
+   typed into the box used to be SAVED as an OpenRouter model — and then every
+   request went to OpenRouter, no NVIDIA key involved. Returns null when the
+   lists don't settle it, in which case the dropdown wins. */
+function detectProviderForId(apiId) {
+  const hits = new Set();
+  try {
+    const c = JSON.parse(localStorage.getItem(NATIVE_CAT_KEY) || "null");
+    const byPid = (c && c.byPid) || {};
+    Object.keys(byPid).forEach((pid) => {
+      const l = byPid[pid] && byPid[pid].models;
+      if (Array.isArray(l) && l.some((mo) => mo && mo.id === apiId)) hits.add(pid);
+    });
+  } catch {}
+  // Curated and already-registered live rows count too — NVIDIA's /models list
+  // only loads through a CORS relay, but its curated ids are known regardless.
+  Object.values(MODELS).forEach((m) => {
+    if (!m.custom && m.apiId === apiId && REG[m.provider]) hits.add(m.provider);
+  });
+  const own = [...hits].filter((p) => !OR_STYLE.includes(p));
+  return own.length === 1 ? own[0] : null;
+}
 function customModelVerify(prov, apiId) {
   // Validate a hand-entered id against whatever live model list we have on hand.
   // Returns 'ok' | {warn} (list unavailable — allow, but say so) | {err} (known-bad id).
@@ -6475,17 +6643,26 @@ function customModelVerify(prov, apiId) {
         "'s model list isn't loaded yet, so this couldn't be verified — remove it with × if chats fail.",
     };
   if (ids.includes(apiId)) return "ok";
+  const owner = detectProviderForId(apiId);
   return {
     err:
       '"' +
       apiId +
       "\" isn't in " +
       src +
-      ". Check the ID (OpenRouter needs vendor/model, e.g. anthropic/claude-opus-5) and try again.",
+      "." +
+      (owner && owner !== prov
+        ? " That id belongs to " +
+          REG[owner].name +
+          " — switch the provider dropdown to " +
+          REG[owner].name +
+          " and add it again."
+        : " Check the ID (OpenRouter needs vendor/model, e.g. anthropic/claude-opus-5) and try again."),
   };
 }
 function addCustomModel() {
-  const prov = $("cmProv").value,
+  const chosenProv = $("cmProv").value;
+  let prov = chosenProv,
     idRaw = $("cmId").value.trim();
   if (!idRaw) return logRot("Custom model: enter an ID", "warn");
   if (/\s/.test(idRaw))
@@ -6497,9 +6674,18 @@ function addCustomModel() {
       "Custom model: IDs may only contain letters, digits, and . - _ : /",
       "warn",
     );
+  const orPair = (p) => p === "openrouter" || p === "openrouter_paid";
+  // The provider dropdown defaults to OpenRouter and most people never touch
+  // it, so NVIDIA/Groq/… ids used to be registered as OpenRouter models and
+  // then sent to OpenRouter for the rest of their life. When a live list says
+  // the id belongs to exactly one other provider — and OpenRouter's own
+  // catalog does NOT list it — trust the list and say so out loud.
+  const owner = detectProviderForId(idRaw);
+  const corrected =
+    owner && orPair(prov) && orCatalogHas(idRaw) !== true ? owner : prov;
+  if (corrected !== prov) prov = corrected;
   if (customModels.some((c) => c.provider === prov && c.apiId === idRaw))
     return logRot("Custom model: you already added this one", "warn");
-  const orPair = (p) => p === "openrouter" || p === "openrouter_paid";
   const dupe = Object.values(MODELS).find(
     (m) =>
       !m.custom &&
@@ -6526,6 +6712,9 @@ function addCustomModel() {
   });
   loadCustomModels();
   saveCustomModels(); // register first, THEN persist — the old order dropped the newest add
+  try {
+    localStorage.setItem(CUSTOM_PROV_KEY, prov); // remember the choice for next time
+  } catch {}
   $("cmId").value = "";
   renderModelPicker(true);
   selectModel(id, true);
@@ -6535,6 +6724,11 @@ function addCustomModel() {
       : "Custom model added (unverified): " + idRaw + " — " + v.warn,
     v === "ok" ? "ok" : "warn",
   );
+  if (prov !== chosenProv)
+    logRot(
+      `Provider corrected to ${REG[prov].name} — that id isn't on OpenRouter, so requests won't be sent there.`,
+      "warn",
+    );
 }
 function removeCustom(id, ev) {
   if (ev) ev.stopPropagation();
@@ -6658,12 +6852,12 @@ function renderModelPicker() {
     )
       .map(
         ([pid, r]) =>
-          `<option value="${pid}"${pid === "openrouter" ? " selected" : ""}>${r.name}</option>`,
+          `<option value="${pid}"${pid === lastCustomProv() ? " selected" : ""}>${r.name}</option>`,
       )
       .join(
         "",
       )}</select><input id="cmId" placeholder="vendor/model-id (e.g. anthropic/claude-opus-5)" spellcheck="false" aria-label="Model ID"><button class="btn-acc" data-act="add-custom">Add</button></div>` +
-    `<div class="mp-custom-hint">Custom models auto-enrich ctx, vision and thinking from the live catalogs.</div>`;
+    `<div class="mp-custom-hint">Pick the provider that actually serves the ID — a model saved under OpenRouter is called on OpenRouter. ctx, vision and thinking auto-enrich from the live catalogs.</div>`;
   // Restore filter state and focus the search box.
   if (mpQuery) mpFilter(mpQuery);
   setTimeout(() => {
@@ -6698,6 +6892,13 @@ function selectModel(id, close) {
   pill.className = "status-pill " + (m.isFree ? "free" : "paid");
   pill.innerHTML = `<span class="dot"></span>${m.isFree ? "Free" : "Paid"}`;
   setAttachUI();
+  // Say it at pick time, not after a failed send: a model whose provider this
+  // page can't reach (NVIDIA NIM without a CORS relay, a missing key) used to
+  // look perfectly usable until the request failed — or quietly left for
+  // OpenRouter and came back with a 402 credit wall. getCfg() logs the
+  // substitution itself when a legitimate fallback exists.
+  const probe = getCfg();
+  if (probe.error) logRot(`${m.name}: ${probe.error}`, "warn");
   if (close) closeModelPicker();
 }
 function syncToggle(t) {
@@ -6720,8 +6921,16 @@ function updateUsageMeter() {
   // answer actually used (rotation may differ from the selected one). Curated
   // entries have no pricing data, so those chats show no $ tag instead of a fake one.
   const cost=(c?.messages||[]).reduce((n,x)=>{ const pr=x.meta&&x.meta.m&&(Object.values(MODELS).find(v=>v.apiId===x.meta.m&&v.pricing)||{}).pricing; return pr?n+(Number(x.meta.in)||0)*(parseFloat(pr.prompt)||0)+(Number(x.meta.out)||0)*(parseFloat(pr.completion)||0):n; },0);
-  const tag=cost>0?" · ~$"+(cost<0.01?cost.toFixed(4):cost.toFixed(2)):REG[m.provider]?.type === "free" || REG[m.provider]?.local ? " · free" : "";
-  const el=$("frameMeta"); if(el) el.textContent="— "+REG[m.provider]?.name?.toUpperCase()+" · "+m.badge?.toUpperCase()+" · "+(ctx?Math.round(used/1000)+"k / "+Math.round(ctx/1000)+"k":"est. —")+tag;
+  // Truth in advertising: the header names the provider that will ACTUALLY
+  // answer. A model registered under NVIDIA NIM that ends up routed elsewhere
+  // used to keep saying "NVIDIA NIM" while the request went to OpenRouter.
+  const via=m.provider&&REG[m.provider]?servingPid(m):null;
+  const rp=REG[via||m.provider]||{};
+  const prov=via&&via!==m.provider
+    ? REG[m.provider].name.toUpperCase()+" → "+REG[via].name.toUpperCase()
+    : (REG[m.provider]?.name?.toUpperCase()||"");
+  const tag=cost>0?" · ~$"+(cost<0.01?cost.toFixed(4):cost.toFixed(2)):rp.type === "free" || rp.local ? " · free" : "";
+  const el=$("frameMeta"); if(el) el.textContent="— "+prov+" · "+m.badge?.toUpperCase()+" · "+(ctx?Math.round(used/1000)+"k / "+Math.round(ctx/1000)+"k":"est. —")+tag;
 }
 
 /* ═══ js/attachments.js ═══ */
@@ -8022,9 +8231,9 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
       try {
         em = JSON.parse(et).error?.message || em;
       } catch {}
-      if (res.status === 402)
-        em =
-          "that model needs OpenRouter credits; pick a FREE model (web search itself is free)";
+      // 402 = the account has no credits for this id. Provider-accurate copy
+      // lives in rotation.js so it can be unit-tested.
+      if (res.status === 402) em = creditWallMessage(pid, cfg.modelId);
       const retriable =
         res.status === 429 ||
         res.status >= 500 ||
@@ -8449,7 +8658,10 @@ function metaCandidates(m, mode = getExtrasMode()) {
       !out.includes(pid) &&
       getKey(pid) &&
       avail(pid) &&
-      canServe(pid, m)
+      // Same honesty rule as chats: a free model's titles/follow-ups must not
+      // be generated by a metered route (an OpenRouter id that is paid there
+      // would just burn a 402 per message).
+      substituteOk(pid, m)
     )
       out.push(pid);
   };
