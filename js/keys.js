@@ -30,7 +30,13 @@ function buildKeyInputs() {
 }
 function keyRow(pid, label, ph) {
   const inp = KEY_INPUTS[pid];
-  return `<div class="sb-key"><div class="sb-key-row"><label class="sb-key-label" for="${inp}"><span class="key-dot" id="dot_${pid}"></span>${label}</label><input type="password" id="${inp}" placeholder="${ph}" spellcheck="false" autocomplete="off" data-pid="${pid}"></div><div style="display:flex;gap:6px;align-items:center"><span style="font-family:var(--font-mono);font-size:.56rem;color:var(--text-faint);text-transform:uppercase">${REG[pid].rpm}</span><button class="btn-test" id="test_${pid}" data-act="test-key" data-pid="${pid}">Test</button></div></div>`;
+  // Providers whose API sends no CORS headers get an optional relay field:
+  // without one the browser can't reach them at all, and we say so instead of
+  // blaming the key.
+  const relay = REG[pid].noCors
+    ? `<div class="sb-key-row" style="margin-top:4px"><label class="sb-key-label" for="relay_${pid}">CORS relay</label><input type="text" id="relay_${pid}" data-relay="${pid}" placeholder="http://localhost:8765 (optional)" spellcheck="false" autocomplete="off" value="${esc(relayBase(pid))}"></div><p class="sb-key-help">Their API sends no CORS headers, so this page can't call it directly. Point this at a local relay that forwards to ${esc(REG[pid].models.replace(/\/v1.*$/, "/v1"))} and the key test, model list and chats all go through it.</p>`
+    : "";
+  return `<div class="sb-key"><div class="sb-key-row"><label class="sb-key-label" for="${inp}"><span class="key-dot" id="dot_${pid}"></span>${label}</label><input type="password" id="${inp}" placeholder="${ph}" spellcheck="false" autocomplete="off" data-pid="${pid}"></div><div style="display:flex;gap:6px;align-items:center"><span style="font-family:var(--font-mono);font-size:.56rem;color:var(--text-faint);text-transform:uppercase">${REG[pid].rpm}</span><button class="btn-test" id="test_${pid}" data-act="test-key" data-pid="${pid}">Test</button></div>${relay}</div>`;
 }
 function getKey(pid) {
   const el = $(KEY_INPUTS[pid]);
@@ -50,30 +56,88 @@ function onKeyEdit(pid) {
     refreshNativeCatalogs();
   }, 700);
 }
+function onRelayEdit(pid) {
+  const el = $("relay_" + pid);
+  try {
+    if (el && el.value.trim()) localStorage.setItem(RELAY_KEY + pid, el.value.trim());
+    else localStorage.removeItem(RELAY_KEY + pid);
+  } catch {}
+  clearTimeout(nativeRefreshTimer);
+  nativeRefreshTimer = setTimeout(() => {
+    try {
+      localStorage.removeItem(NATIVE_CAT_KEY);
+    } catch {}
+    refreshNativeCatalogs();
+  }, 700);
+}
 function setDot(pid, state) {
   const d = $("dot_" + pid);
   if (d)
     d.className =
       "key-dot " + (state === "ok" ? "ok" : state === "bad" ? "bad" : "");
 }
+/* Pure classifier behind the Test button, kept apart from the DOM so
+   tests/provider-semantics.js can pin it. The whole point: "the browser never
+   got a response" is NOT evidence about the key, so it must not render Fail. */
+function keyTestOutcome(kind, status) {
+  if (kind === "ok")
+    return { dot: "ok", btn: "ok", label: "OK ✓", type: "ok", msg: "key valid" };
+  if (kind === "blocked")
+    return {
+      dot: "",
+      btn: "",
+      label: "Unverified",
+      type: "warn",
+      msg: "key saved — their API can't be reached from a browser (no CORS headers), so it wasn't verified. Add a relay above to test it, or just send a message",
+    };
+  if (kind === "rejected")
+    return {
+      dot: "bad",
+      btn: "err",
+      label: "Fail",
+      type: "err",
+      msg: `key rejected (${status}) — fix it above`,
+    };
+  if (kind === "http")
+    return {
+      dot: "",
+      btn: "",
+      label: "Saved",
+      type: "warn",
+      msg: `key saved — their list endpoint answered HTTP ${status}, which says nothing about the key`,
+    };
+  if (kind === "nolist")
+    return {
+      dot: "ok",
+      btn: "ok",
+      label: "OK ✓",
+      type: "ok",
+      msg: "key saved (no list endpoint to ping)",
+    };
+  return {
+    dot: "",
+    btn: "",
+    label: "Test",
+    type: "warn",
+    msg: "no key to test",
+  };
+}
 async function testKey(pid) {
   const key = getKey(pid),
     btn = $("test_" + pid);
-  if (!key) {
-    setDot(pid, "empty");
-    btn.textContent = "Test";
-    btn.className = "btn-test";
-    return logRot(`${REG[pid].name}: no key to test`, "warn");
-  }
-  if (!REG[pid].models) {
-    setDot(pid, "ok");
-    btn.textContent = "OK ✓";
-    btn.className = "btn-test ok";
-    return logRot(
-      `${REG[pid].name}: key saved (no list endpoint to ping)`,
-      "ok",
-    );
-  }
+  const paint = (o) => {
+    setDot(pid, o.dot);
+    if (btn) {
+      btn.textContent = o.label;
+      btn.className = "btn-test" + (o.btn ? " " + o.btn : "");
+    }
+    logRot(`${REG[pid].name}: ${o.msg}`, o.type);
+  };
+  if (!key) return paint(keyTestOutcome("empty"));
+  if (!REG[pid].models) return paint(keyTestOutcome("nolist"));
+  // Don't even fire a request the browser is going to kill: the answer is
+  // already known ("Unverified — needs a relay") and the console stays clean.
+  if (relayNeeded(pid)) return paint(keyTestOutcome("blocked"));
   btn.textContent = "…";
   try {
     const h = { "Content-Type": "application/json" };
@@ -82,18 +146,24 @@ async function testKey(pid) {
       h["anthropic-version"] = "2023-06-01";
       h["anthropic-dangerous-direct-browser-access"] = "true";
     } else h["Authorization"] = "Bearer " + key;
-    const res = await fetch(REG[pid].models, { headers: h });
-    if (res.ok) {
-      setDot(pid, "ok");
-      btn.textContent = "OK ✓";
-      btn.className = "btn-test ok";
-      logRot(`${REG[pid].name} key valid`, "ok");
-    } else throw new Error(res.status);
-  } catch (e) {
-    setDot(pid, "bad");
-    btn.textContent = "Fail";
-    btn.className = "btn-test err";
-    logRot(`${REG[pid].name} key test failed (${e.message})`, "err");
+    const res = await fetch(relayUrl(pid, REG[pid].models), { headers: h });
+    if (res.ok) paint(keyTestOutcome("ok"));
+    else if (res.status === 401 || res.status === 403) {
+      // A real rejection: park the provider out of rotation until it's edited.
+      rotState[pid] = { ...(rotState[pid] || {}), bad: true };
+      paint(keyTestOutcome("rejected", res.status));
+    } else paint(keyTestOutcome("http", res.status));
+  } catch {
+    // A failed fetch means the request never completed: CORS-blocked, offline,
+    // or a relay that isn't running. Report it as unverified, never as Fail.
+    const via = relayBase(pid);
+    paint(
+      Object.assign(keyTestOutcome("blocked"), {
+        msg: via
+          ? `key saved — the CORS relay at ${via} didn't answer (is it running?)`
+          : keyTestOutcome("blocked").msg,
+      }),
+    );
   }
 }
 function loadAll() {

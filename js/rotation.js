@@ -17,6 +17,10 @@ function logRot(msg, type = "evt") {
   while (log.children.length > 25) log.removeChild(log.firstChild);
 }
 function avail(pid) {
+  // A provider whose API sends no CORS headers is unreachable from this page
+  // unless a relay is configured — that's an availability fact, not a
+  // rate-limit, so it's checked before anything else.
+  if (relayNeeded(pid)) return false;
   const s = rotState[pid];
   if (!s) return true;
   if (s.bad) return false;
@@ -47,14 +51,26 @@ function markOk(pid) {
 }
 const OR_STYLE = ["openrouter", "openrouter_paid"];
 const OR_HOSTABLE = /^[a-z0-9~-][a-z0-9._~-]*\/[a-z0-9._~-]+$/i;
+function orHosts(id) {
+  // OpenRouter can only proxy an id it actually lists. The vendor/model shape
+  // heuristic is a decent guess, but when the live catalog is on hand use it:
+  // NVIDIA-native ids (meta/llama-3.3-70b-instruct) have the right shape and
+  // would otherwise cost a guaranteed 404 round trip on every fallback.
+  try {
+    const c = JSON.parse(localStorage.getItem(OR_CAT_KEY) || "null");
+    if (c && Array.isArray(c.models) && c.models.length)
+      return c.models.some((mo) => mo.id === id);
+  } catch {}
+  return OR_HOSTABLE.test(id);
+}
 function canServe(pid, m) {
   if (pid === m.provider) return true;
-  if (OR_STYLE.includes(pid) && OR_HOSTABLE.test(m.apiId)) return true;
+  if (OR_STYLE.includes(pid) && orHosts(m.apiId)) return true;
   return false;
 }
 function idFor(pid, m) {
   if (pid === m.provider) return m.apiId;
-  if (OR_STYLE.includes(pid) && OR_HOSTABLE.test(m.apiId)) return m.apiId;
+  if (OR_STYLE.includes(pid) && orHosts(m.apiId)) return m.apiId;
   return FALLBACK_ID[pid] || m.apiId;
 }
 function getCfg(excludedPids = []) {
@@ -90,6 +106,10 @@ function getCfg(excludedPids = []) {
     if (missing.length)
       return {
         error: `"${m.name}" needs ${missing.map((p) => REG[p].name).join(" or ")} — add that key in Settings, or pick a model you have a key for.`,
+      };
+    if (REG[m.provider].noCors)
+      return {
+        error: `"${m.name}" is served by ${REG[m.provider].name}, whose API sends no CORS headers — a browser can't call it directly. Add a local relay for it in Settings (or pick a model another provider hosts).`,
       };
     return {
       error: `All providers for "${m.name}" are rate-limited or rejected the request. Free tiers can be busy — wait a moment, pick another free model, or add a paid key.`,

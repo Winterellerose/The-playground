@@ -126,6 +126,8 @@ function bindEvents() {
   // API key rows: input events delegate at the section containers.
   ["freeKeys", "paidKeys"].forEach((id) =>
     $(id).addEventListener("input", (e) => {
+      const relay = e.target.dataset.relay;
+      if (relay) return onRelayEdit(relay);
       const pid = e.target.dataset.pid;
       if (pid) onKeyEdit(pid);
     }),

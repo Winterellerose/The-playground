@@ -227,3 +227,47 @@ function safeWebUrl(value) {
     return "";
   }
 }
+
+/* ── CORS relay ──
+   Some providers (NVIDIA's integrate.api.nvidia.com today) send no
+   Access-Control-Allow-Origin, so a browser gets "Failed to fetch" no matter
+   how good the key is. A relay is a small local proxy that forwards to the
+   provider and adds the CORS headers. The stored value is the RELAY ROOT that
+   stands in for the provider's `<origin>/v1` — with the relay at
+   http://localhost:8765, .../v1/chat/completions is fetched as
+   http://localhost:8765/chat/completions, which is what pass-through relays
+   (nim-cors-proxy et al.) mount. A root given with a trailing /v1 means the
+   same thing; the two are deliberately interchangeable. */
+const RELAY_KEY = "pg_relay_";
+function relayBase(pid) {
+  let v = "";
+  try {
+    v = localStorage.getItem(RELAY_KEY + pid) || "";
+  } catch {}
+  v = String(v).trim();
+  if (!v) return "";
+  try {
+    const u = new URL(v);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return "";
+    // Plain http is only sane on this machine: an nvapi- key must not be sent
+    // in the clear to some remote host the user pasted in.
+    if (u.protocol === "http:" && u.hostname !== "localhost" && u.hostname !== "127.0.0.1") return "";
+  } catch {
+    return ""; // anything the URL parser rejects is never fetched
+  }
+  return v.replace(/\/+$/, "").replace(/\/v1$/, "");
+}
+function relayUrl(pid, url) {
+  const base = relayBase(pid);
+  if (!base) return url;
+  try {
+    const u = new URL(url);
+    return base + u.pathname.replace(/^\/v1/, "") + (u.search || "");
+  } catch {
+    return url;
+  }
+}
+// True when the provider can't be reached directly AND no relay is set.
+function relayNeeded(pid) {
+  return !!(REG[pid] && REG[pid].noCors && !relayBase(pid));
+}

@@ -68,7 +68,7 @@ async function metaChat(messages, m, mode = getExtrasMode()) {
       const to = setTimeout(() => ac.abort(), 15000);
       let res, txt;
       try {
-        res = await fetch(REG[pid].url, {
+        res = await fetch(relayUrl(pid, REG[pid].url), {
           method: "POST",
           headers: h,
           body: JSON.stringify(body),

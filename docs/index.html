@@ -10,7 +10,7 @@
      host the app may talk to (REG providers + search APIs + local servers) so
      injected script can't exfiltrate keys elsewhere. Adding a provider in
      js/config.js means adding its origin here too. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src https: data:; connect-src https://openrouter.ai https://api.groq.com https://api.cerebras.ai https://generativelanguage.googleapis.com https://api.mistral.ai https://api.cohere.com https://integrate.api.nvidia.com https://api.deepseek.com https://api.z.ai https://api.anthropic.com https://api.openai.com https://api.sambanova.ai https://api.tavily.com https://google.serper.dev https://api.search.brave.com http://localhost:11434 http://localhost:1234; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src https: data:; connect-src https://openrouter.ai https://api.groq.com https://api.cerebras.ai https://generativelanguage.googleapis.com https://api.mistral.ai https://api.cohere.com https://integrate.api.nvidia.com http://localhost:8765 http://127.0.0.1:8765 https://api.deepseek.com https://api.z.ai https://api.anthropic.com https://api.openai.com https://api.sambanova.ai https://api.tavily.com https://google.serper.dev https://api.search.brave.com http://localhost:11434 http://localhost:1234; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <title>The Playground — Multi-Provider AI Studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -3828,7 +3828,7 @@ html { scrollbar-width: thin; scrollbar-color: #2d2d29 transparent; }
     <div class="landing-label">Initializing</div>
     <h1 class="landing-title">The <em>playground.</em></h1>
     <div class="landing-bar"><div class="landing-bar-fill"></div></div>
-    <div class="landing-meta"><span>Preparing studio</span><span>v3.0.0</span></div>
+    <div class="landing-meta"><span>Preparing studio</span><span>v3.0.1</span></div>
     <div class="landing-enter">Press to enter</div>
   </div>
 </div>
@@ -3871,7 +3871,7 @@ html { scrollbar-width: thin; scrollbar-color: #2d2d29 transparent; }
       <div>
         <div class="key-section-header"><span class="key-section-name free">Free APIs</span><span class="key-section-count" id="freeKeyCount">0 keys set</span></div>
         <div id="freeKeys"></div>
-        <p class="sb-key-help">Free tiers: OpenRouter 20 RPM · Groq 30 RPM · Cerebras 30 RPM · Gemini ~10 RPM · Mistral 1 rps · Cohere trial · NVIDIA 40 RPM · DeepSeek pay-as-you-go (very cheap).</p>
+        <p class="sb-key-help">Free tiers: OpenRouter 20 RPM · Groq 30 RPM · Cerebras 30 RPM · Gemini ~10 RPM · Mistral 1 rps · Cohere trial · NVIDIA 40 RPM (needs a local CORS relay — their API blocks browser calls) · DeepSeek pay-as-you-go (very cheap).</p>
       </div>
 
       <div>
@@ -4005,7 +4005,23 @@ html { scrollbar-width: thin; scrollbar-color: #2d2d29 transparent; }
 
 "use strict";
 /* ════════════════════════════════════════════════════════════
-   THE PLAYGROUND v3.0.0 — multi-provider AI studio (single file)
+   THE PLAYGROUND v3.0.1 — multi-provider AI studio (single file)
+   v3.0.1: NVIDIA NIM truth-in-advertising. Their API sends no
+   Access-Control-Allow-Origin, so the browser — not the key — rejected every
+   direct call: the Test button showed a red "Fail" for a perfectly good
+   nvapi- key, the live /models list silently stayed empty, and chats died in
+   the stream catch. Test now reports "Unverified" for a request that never
+   completed and reserves Fail for a real 401/403; NVIDIA is skipped by
+   rotation unless a local CORS relay is configured (Settings → NVIDIA →
+   relay, e.g. http://localhost:8765), and the relay is what chats, the key
+   test and the catalog all go through when present. Also fixed: native model
+   lists dropped every vendor/-prefixed id, which threw away NVIDIA's entire
+   catalog (REG[].namespaced opts back in), OpenRouter fallbacks are now
+   checked against the live catalog so a guaranteed 404 isn't attempted, and
+   the stale built docs/ copy of sw.js (still v3 while the source was v4) is
+   regenerated with the shell cache bumped to playground-v5 — which is what
+   CI's "Built artifact is in sync" step had been failing on.
+   Unit checks: tests/provider-semantics.js (npm test).
    v3.0.0: PWA/offline shell; Ollama + LM Studio local models; full-text chat search; keyboard shortcuts and voice input; context/cost estimates; IndexedDB large-image storage; token-aware history; CI, Pages and model audit; stale duplicate tree removed and README added.
    v2.9.4: sticky scroll — auto-scroll pauses when you scroll up to reread during a stream; a ↓ Latest pill returns to the newest message. Sending, regenerating or switching chats re-engages the chase.
    v2.9.3: accessibility — every icon-only control carries a real
@@ -4162,6 +4178,17 @@ const REG = {
     models: "https://integrate.api.nvidia.com/v1/models",
     style: "none",
     rpm: "40 RPM",
+    /* noCors: integrate.api.nvidia.com answers with no Access-Control-Allow-
+       Origin on any path (key test, /models and chat alike) and offers no
+       Anthropic-style browser opt-in, so the browser — not NVIDIA — rejects
+       the call. A key that works with curl always "failed" the old Test
+       button. The provider is therefore only used when a local CORS relay is
+       configured (Settings → NVIDIA → relay); otherwise rotation routes its
+       models elsewhere.
+       namespaced: NVIDIA ids are `vendor/model` like OpenRouter's, so the live
+       /models catalog must not strip them as OpenRouter-only noise. */
+    noCors: true,
+    namespaced: true,
   },
   deepseek: {
     name: "DeepSeek",
@@ -5094,6 +5121,50 @@ function safeWebUrl(value) {
   }
 }
 
+/* ── CORS relay ──
+   Some providers (NVIDIA's integrate.api.nvidia.com today) send no
+   Access-Control-Allow-Origin, so a browser gets "Failed to fetch" no matter
+   how good the key is. A relay is a small local proxy that forwards to the
+   provider and adds the CORS headers. The stored value is the RELAY ROOT that
+   stands in for the provider's `<origin>/v1` — with the relay at
+   http://localhost:8765, .../v1/chat/completions is fetched as
+   http://localhost:8765/chat/completions, which is what pass-through relays
+   (nim-cors-proxy et al.) mount. A root given with a trailing /v1 means the
+   same thing; the two are deliberately interchangeable. */
+const RELAY_KEY = "pg_relay_";
+function relayBase(pid) {
+  let v = "";
+  try {
+    v = localStorage.getItem(RELAY_KEY + pid) || "";
+  } catch {}
+  v = String(v).trim();
+  if (!v) return "";
+  try {
+    const u = new URL(v);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return "";
+    // Plain http is only sane on this machine: an nvapi- key must not be sent
+    // in the clear to some remote host the user pasted in.
+    if (u.protocol === "http:" && u.hostname !== "localhost" && u.hostname !== "127.0.0.1") return "";
+  } catch {
+    return ""; // anything the URL parser rejects is never fetched
+  }
+  return v.replace(/\/+$/, "").replace(/\/v1$/, "");
+}
+function relayUrl(pid, url) {
+  const base = relayBase(pid);
+  if (!base) return url;
+  try {
+    const u = new URL(url);
+    return base + u.pathname.replace(/^\/v1/, "") + (u.search || "");
+  } catch {
+    return url;
+  }
+}
+// True when the provider can't be reached directly AND no relay is set.
+function relayNeeded(pid) {
+  return !!(REG[pid] && REG[pid].noCors && !relayBase(pid));
+}
+
 /* ═══ js/markdown.js ═══ */
 "use strict";
 /* ═══ markdown.js — marked + DOMPurify rendering pipeline ═══ */
@@ -5568,6 +5639,16 @@ async function refreshCatalog(force) {
    load and hourly — no manual edits required. */
 const NATIVE_CAT_TTL = 3600e3,
   NATIVE_CAT_KEY = "pg_native_catalog_v1";
+/* Which ids from a provider's own /models list may enter the picker.
+   Most native APIs use bare ids and vendor/-prefixed ones are OpenRouter's
+   noise — but not all of them: NVIDIA (namespaced in REG) only ever returns
+   `meta/llama-3.3-70b-instruct`-style ids, so the old blanket slash filter
+   silently discarded NVIDIA's entire catalog. */
+function nativeIdUsable(pid, id) {
+  const r = REG[pid] || {};
+  if (!String(id || "").includes("/")) return true;
+  return pid === "openrouter" || pid === "openrouter_paid" || !!r.namespaced;
+}
 function parseNativeModels(pid, data) {
   let arr = Array.isArray(data) ? data : data.data || data.models || [];
   const out = [];
@@ -5610,13 +5691,7 @@ function applyNativeCatalog(pid, list) {
   let added = 0;
   for (const mo of list) {
     if (!mo.id || known.has(mo.id)) continue;
-    // Native APIs use bare ids (no vendor/ prefix); vendor/ ids come from OR.
-    if (
-      pid !== "openrouter" &&
-      pid !== "openrouter_paid" &&
-      mo.id.includes("/")
-    )
-      continue;
+    if (!nativeIdUsable(pid, mo.id)) continue;
     const k = "nat:" + pid + ":" + mo.id;
     if (MODELS[k]) continue;
     MODELS[k] = {
@@ -5635,7 +5710,7 @@ function applyNativeCatalog(pid, list) {
     };
     added++;
   }
-  const idset = new Set(list.map((x) => x.id));
+  const idset = new Set(list.filter((x) => nativeIdUsable(pid, x.id)).map((x) => x.id));
   Object.values(MODELS).forEach((m) => {
     if (m.provider === pid && !m.live && idset.has(m.apiId)) m.verified = true;
   });
@@ -5661,6 +5736,9 @@ async function refreshNativeCatalogs() {
   const jobs = Object.keys(REG).map(async (pid) => {
     const r = REG[pid];
     if (!r.models || pid === "openrouter" || pid === "openrouter_paid") return;
+    // A provider with no CORS headers can only be reached through a relay;
+    // without one, the request would just die in the console as "Failed to fetch".
+    if (relayNeeded(pid)) return;
     if (freshAll && results[pid] && Array.isArray(results[pid].models)) {
       applyNativeCatalog(pid, results[pid].models);
       return;
@@ -5675,7 +5753,7 @@ async function refreshNativeCatalogs() {
         headers["x-api-key"] = key;
         headers["anthropic-version"] = "2023-06-01";
       } else if (!r.local) headers["Authorization"] = "Bearer " + key;
-      const res = await fetch(r.models, { headers, signal: ac.signal });
+      const res = await fetch(relayUrl(pid, r.models), { headers, signal: ac.signal });
       if (!res.ok) return;
       const data = await res.json();
       const models = parseNativeModels(pid, data);
@@ -5731,7 +5809,13 @@ function buildKeyInputs() {
 }
 function keyRow(pid, label, ph) {
   const inp = KEY_INPUTS[pid];
-  return `<div class="sb-key"><div class="sb-key-row"><label class="sb-key-label" for="${inp}"><span class="key-dot" id="dot_${pid}"></span>${label}</label><input type="password" id="${inp}" placeholder="${ph}" spellcheck="false" autocomplete="off" data-pid="${pid}"></div><div style="display:flex;gap:6px;align-items:center"><span style="font-family:var(--font-mono);font-size:.56rem;color:var(--text-faint);text-transform:uppercase">${REG[pid].rpm}</span><button class="btn-test" id="test_${pid}" data-act="test-key" data-pid="${pid}">Test</button></div></div>`;
+  // Providers whose API sends no CORS headers get an optional relay field:
+  // without one the browser can't reach them at all, and we say so instead of
+  // blaming the key.
+  const relay = REG[pid].noCors
+    ? `<div class="sb-key-row" style="margin-top:4px"><label class="sb-key-label" for="relay_${pid}">CORS relay</label><input type="text" id="relay_${pid}" data-relay="${pid}" placeholder="http://localhost:8765 (optional)" spellcheck="false" autocomplete="off" value="${esc(relayBase(pid))}"></div><p class="sb-key-help">Their API sends no CORS headers, so this page can't call it directly. Point this at a local relay that forwards to ${esc(REG[pid].models.replace(/\/v1.*$/, "/v1"))} and the key test, model list and chats all go through it.</p>`
+    : "";
+  return `<div class="sb-key"><div class="sb-key-row"><label class="sb-key-label" for="${inp}"><span class="key-dot" id="dot_${pid}"></span>${label}</label><input type="password" id="${inp}" placeholder="${ph}" spellcheck="false" autocomplete="off" data-pid="${pid}"></div><div style="display:flex;gap:6px;align-items:center"><span style="font-family:var(--font-mono);font-size:.56rem;color:var(--text-faint);text-transform:uppercase">${REG[pid].rpm}</span><button class="btn-test" id="test_${pid}" data-act="test-key" data-pid="${pid}">Test</button></div>${relay}</div>`;
 }
 function getKey(pid) {
   const el = $(KEY_INPUTS[pid]);
@@ -5751,30 +5835,88 @@ function onKeyEdit(pid) {
     refreshNativeCatalogs();
   }, 700);
 }
+function onRelayEdit(pid) {
+  const el = $("relay_" + pid);
+  try {
+    if (el && el.value.trim()) localStorage.setItem(RELAY_KEY + pid, el.value.trim());
+    else localStorage.removeItem(RELAY_KEY + pid);
+  } catch {}
+  clearTimeout(nativeRefreshTimer);
+  nativeRefreshTimer = setTimeout(() => {
+    try {
+      localStorage.removeItem(NATIVE_CAT_KEY);
+    } catch {}
+    refreshNativeCatalogs();
+  }, 700);
+}
 function setDot(pid, state) {
   const d = $("dot_" + pid);
   if (d)
     d.className =
       "key-dot " + (state === "ok" ? "ok" : state === "bad" ? "bad" : "");
 }
+/* Pure classifier behind the Test button, kept apart from the DOM so
+   tests/provider-semantics.js can pin it. The whole point: "the browser never
+   got a response" is NOT evidence about the key, so it must not render Fail. */
+function keyTestOutcome(kind, status) {
+  if (kind === "ok")
+    return { dot: "ok", btn: "ok", label: "OK ✓", type: "ok", msg: "key valid" };
+  if (kind === "blocked")
+    return {
+      dot: "",
+      btn: "",
+      label: "Unverified",
+      type: "warn",
+      msg: "key saved — their API can't be reached from a browser (no CORS headers), so it wasn't verified. Add a relay above to test it, or just send a message",
+    };
+  if (kind === "rejected")
+    return {
+      dot: "bad",
+      btn: "err",
+      label: "Fail",
+      type: "err",
+      msg: `key rejected (${status}) — fix it above`,
+    };
+  if (kind === "http")
+    return {
+      dot: "",
+      btn: "",
+      label: "Saved",
+      type: "warn",
+      msg: `key saved — their list endpoint answered HTTP ${status}, which says nothing about the key`,
+    };
+  if (kind === "nolist")
+    return {
+      dot: "ok",
+      btn: "ok",
+      label: "OK ✓",
+      type: "ok",
+      msg: "key saved (no list endpoint to ping)",
+    };
+  return {
+    dot: "",
+    btn: "",
+    label: "Test",
+    type: "warn",
+    msg: "no key to test",
+  };
+}
 async function testKey(pid) {
   const key = getKey(pid),
     btn = $("test_" + pid);
-  if (!key) {
-    setDot(pid, "empty");
-    btn.textContent = "Test";
-    btn.className = "btn-test";
-    return logRot(`${REG[pid].name}: no key to test`, "warn");
-  }
-  if (!REG[pid].models) {
-    setDot(pid, "ok");
-    btn.textContent = "OK ✓";
-    btn.className = "btn-test ok";
-    return logRot(
-      `${REG[pid].name}: key saved (no list endpoint to ping)`,
-      "ok",
-    );
-  }
+  const paint = (o) => {
+    setDot(pid, o.dot);
+    if (btn) {
+      btn.textContent = o.label;
+      btn.className = "btn-test" + (o.btn ? " " + o.btn : "");
+    }
+    logRot(`${REG[pid].name}: ${o.msg}`, o.type);
+  };
+  if (!key) return paint(keyTestOutcome("empty"));
+  if (!REG[pid].models) return paint(keyTestOutcome("nolist"));
+  // Don't even fire a request the browser is going to kill: the answer is
+  // already known ("Unverified — needs a relay") and the console stays clean.
+  if (relayNeeded(pid)) return paint(keyTestOutcome("blocked"));
   btn.textContent = "…";
   try {
     const h = { "Content-Type": "application/json" };
@@ -5783,18 +5925,24 @@ async function testKey(pid) {
       h["anthropic-version"] = "2023-06-01";
       h["anthropic-dangerous-direct-browser-access"] = "true";
     } else h["Authorization"] = "Bearer " + key;
-    const res = await fetch(REG[pid].models, { headers: h });
-    if (res.ok) {
-      setDot(pid, "ok");
-      btn.textContent = "OK ✓";
-      btn.className = "btn-test ok";
-      logRot(`${REG[pid].name} key valid`, "ok");
-    } else throw new Error(res.status);
-  } catch (e) {
-    setDot(pid, "bad");
-    btn.textContent = "Fail";
-    btn.className = "btn-test err";
-    logRot(`${REG[pid].name} key test failed (${e.message})`, "err");
+    const res = await fetch(relayUrl(pid, REG[pid].models), { headers: h });
+    if (res.ok) paint(keyTestOutcome("ok"));
+    else if (res.status === 401 || res.status === 403) {
+      // A real rejection: park the provider out of rotation until it's edited.
+      rotState[pid] = { ...(rotState[pid] || {}), bad: true };
+      paint(keyTestOutcome("rejected", res.status));
+    } else paint(keyTestOutcome("http", res.status));
+  } catch {
+    // A failed fetch means the request never completed: CORS-blocked, offline,
+    // or a relay that isn't running. Report it as unverified, never as Fail.
+    const via = relayBase(pid);
+    paint(
+      Object.assign(keyTestOutcome("blocked"), {
+        msg: via
+          ? `key saved — the CORS relay at ${via} didn't answer (is it running?)`
+          : keyTestOutcome("blocked").msg,
+      }),
+    );
   }
 }
 function loadAll() {
@@ -5886,6 +6034,10 @@ function logRot(msg, type = "evt") {
   while (log.children.length > 25) log.removeChild(log.firstChild);
 }
 function avail(pid) {
+  // A provider whose API sends no CORS headers is unreachable from this page
+  // unless a relay is configured — that's an availability fact, not a
+  // rate-limit, so it's checked before anything else.
+  if (relayNeeded(pid)) return false;
   const s = rotState[pid];
   if (!s) return true;
   if (s.bad) return false;
@@ -5916,14 +6068,26 @@ function markOk(pid) {
 }
 const OR_STYLE = ["openrouter", "openrouter_paid"];
 const OR_HOSTABLE = /^[a-z0-9~-][a-z0-9._~-]*\/[a-z0-9._~-]+$/i;
+function orHosts(id) {
+  // OpenRouter can only proxy an id it actually lists. The vendor/model shape
+  // heuristic is a decent guess, but when the live catalog is on hand use it:
+  // NVIDIA-native ids (meta/llama-3.3-70b-instruct) have the right shape and
+  // would otherwise cost a guaranteed 404 round trip on every fallback.
+  try {
+    const c = JSON.parse(localStorage.getItem(OR_CAT_KEY) || "null");
+    if (c && Array.isArray(c.models) && c.models.length)
+      return c.models.some((mo) => mo.id === id);
+  } catch {}
+  return OR_HOSTABLE.test(id);
+}
 function canServe(pid, m) {
   if (pid === m.provider) return true;
-  if (OR_STYLE.includes(pid) && OR_HOSTABLE.test(m.apiId)) return true;
+  if (OR_STYLE.includes(pid) && orHosts(m.apiId)) return true;
   return false;
 }
 function idFor(pid, m) {
   if (pid === m.provider) return m.apiId;
-  if (OR_STYLE.includes(pid) && OR_HOSTABLE.test(m.apiId)) return m.apiId;
+  if (OR_STYLE.includes(pid) && orHosts(m.apiId)) return m.apiId;
   return FALLBACK_ID[pid] || m.apiId;
 }
 function getCfg(excludedPids = []) {
@@ -5959,6 +6123,10 @@ function getCfg(excludedPids = []) {
     if (missing.length)
       return {
         error: `"${m.name}" needs ${missing.map((p) => REG[p].name).join(" or ")} — add that key in Settings, or pick a model you have a key for.`,
+      };
+    if (REG[m.provider].noCors)
+      return {
+        error: `"${m.name}" is served by ${REG[m.provider].name}, whose API sends no CORS headers — a browser can't call it directly. Add a local relay for it in Settings (or pick a model another provider hosts).`,
       };
     return {
       error: `All providers for "${m.name}" are rate-limited or rejected the request. Free tiers can be busy — wait a moment, pick another free model, or add a paid key.`,
@@ -7587,7 +7755,7 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
       `→ ${REG[pid].name} · ${cfg.modelId}${cfg.webSources && cfg.webSources.length ? " · 🌐 web" : ""}`,
       "ok",
     );
-    const res = await fetch(REG[pid].url, {
+    const res = await fetch(relayUrl(pid, REG[pid].url), {
       method: "POST",
       headers: h,
       body: JSON.stringify(rb),
@@ -7777,13 +7945,21 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
       return { content: "", thinking: "", meta: null, aborted: true };
     }
     if (e.name !== "AbortError") {
-      showError(e.message, () => {
+      let em = e.message;
+      // With a relay configured, a dead fetch means the relay is down — the
+      // provider call itself never happens from here.
+      if (
+        relayBase(pid) &&
+        /failed to fetch|load failed|networkerror/i.test(String(em || ""))
+      )
+        em = `${REG[pid].name}: the CORS relay at ${relayBase(pid)} didn't answer — is it running?`;
+      showError(em, () => {
         if (gen === streamGen) {
           msgDiv.remove();
           runCompletion(c, regenIdx);
         }
       });
-      logRot(`Error: ${e.message}`, "err");
+      logRot(`Error: ${em}`, "err");
     }
   }
   if (gen !== streamGen) {
@@ -8068,7 +8244,7 @@ async function metaChat(messages, m, mode = getExtrasMode()) {
       const to = setTimeout(() => ac.abort(), 15000);
       let res, txt;
       try {
-        res = await fetch(REG[pid].url, {
+        res = await fetch(relayUrl(pid, REG[pid].url), {
           method: "POST",
           headers: h,
           body: JSON.stringify(body),
@@ -8506,6 +8682,8 @@ function bindEvents() {
   // API key rows: input events delegate at the section containers.
   ["freeKeys", "paidKeys"].forEach((id) =>
     $(id).addEventListener("input", (e) => {
+      const relay = e.target.dataset.relay;
+      if (relay) return onRelayEdit(relay);
       const pid = e.target.dataset.pid;
       if (pid) onKeyEdit(pid);
     }),

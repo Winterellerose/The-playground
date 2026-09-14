@@ -10,7 +10,7 @@
      host the app may talk to (REG providers + search APIs + local servers) so
      injected script can't exfiltrate keys elsewhere. Adding a provider in
      js/config.js means adding its origin here too. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src https: data:; connect-src https://openrouter.ai https://api.groq.com https://api.cerebras.ai https://generativelanguage.googleapis.com https://api.mistral.ai https://api.cohere.com https://integrate.api.nvidia.com https://api.deepseek.com https://api.z.ai https://api.anthropic.com https://api.openai.com https://api.sambanova.ai https://api.tavily.com https://google.serper.dev https://api.search.brave.com http://localhost:11434 http://localhost:1234; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src https: data:; connect-src https://openrouter.ai https://api.groq.com https://api.cerebras.ai https://generativelanguage.googleapis.com https://api.mistral.ai https://api.cohere.com https://integrate.api.nvidia.com http://localhost:8765 http://127.0.0.1:8765 https://api.deepseek.com https://api.z.ai https://api.anthropic.com https://api.openai.com https://api.sambanova.ai https://api.tavily.com https://google.serper.dev https://api.search.brave.com http://localhost:11434 http://localhost:1234; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <title>The Playground — Multi-Provider AI Studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -29,7 +29,7 @@
     <div class="landing-label">Initializing</div>
     <h1 class="landing-title">The <em>playground.</em></h1>
     <div class="landing-bar"><div class="landing-bar-fill"></div></div>
-    <div class="landing-meta"><span>Preparing studio</span><span>v3.0.0</span></div>
+    <div class="landing-meta"><span>Preparing studio</span><span>v3.0.1</span></div>
     <div class="landing-enter">Press to enter</div>
   </div>
 </div>
@@ -72,7 +72,7 @@
       <div>
         <div class="key-section-header"><span class="key-section-name free">Free APIs</span><span class="key-section-count" id="freeKeyCount">0 keys set</span></div>
         <div id="freeKeys"></div>
-        <p class="sb-key-help">Free tiers: OpenRouter 20 RPM · Groq 30 RPM · Cerebras 30 RPM · Gemini ~10 RPM · Mistral 1 rps · Cohere trial · NVIDIA 40 RPM · DeepSeek pay-as-you-go (very cheap).</p>
+        <p class="sb-key-help">Free tiers: OpenRouter 20 RPM · Groq 30 RPM · Cerebras 30 RPM · Gemini ~10 RPM · Mistral 1 rps · Cohere trial · NVIDIA 40 RPM (needs a local CORS relay — their API blocks browser calls) · DeepSeek pay-as-you-go (very cheap).</p>
       </div>
 
       <div>

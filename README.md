@@ -17,6 +17,9 @@ Provider rotation, live catalogs, vision and text attachments, web search, per-c
 ## Local models
 Start Ollama or LM Studio's OpenAI-compatible server and select a discovered local model. On GitHub Pages/non-localhost origins, start Ollama with `OLLAMA_ORIGINS=*`; `npm run dev` generally works without it. LM Studio permits cross-origin requests by default.
 
+## CORS-blocked providers (NVIDIA NIM)
+`integrate.api.nvidia.com` sends no `Access-Control-Allow-Origin`, so a browser can never call it directly — that is a property of their gateway, not of your key (curl with the same key works fine). In this app such a provider is marked `noCors`, stays out of rotation, and says **"Unverified"** instead of "Fail" in Settings. To use it anyway, run a local relay that adds the headers and forwards to `https://integrate.api.nvidia.com/v1` (e.g. `nim-cors-proxy` on `http://localhost:8765`), then put that root in Settings → NVIDIA NIM → **CORS relay**; the key test, the live model list and chat requests all go through it. The page's CSP pre-allows `localhost:8765` and `127.0.0.1:8765` — a relay on another port needs the `connect-src` line in `index.html` (and the built `docs/index.html`) extended. Plain-http relays are accepted only on localhost; anything remote must be https, since the key rides along in the clear otherwise.
+
 ## Security
 Keys remain only in browser localStorage and go directly to providers—never use shared machines. Anonymous/stealth providers may retain prompts; do not submit secrets. Voice input is the exception to the local-only design: it uses the browser's built-in speech recognition, which streams audio to the browser vendor's servers (Google's, in Chrome).
 
