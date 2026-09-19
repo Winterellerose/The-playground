@@ -1,0 +1,40 @@
+name: Promote rebuilt docs
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - '.github/workflows/promote-docs.yml'
+permissions:
+  contents: write
+jobs:
+  promote:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Take rebuilt docs/index.html from Copilot branch
+        run: |
+          set -euo pipefail
+          git fetch origin copilot/fix-docs-index-html
+          git checkout origin/copilot/fix-docs-index-html -- docs/index.html
+          wc -c docs/index.html
+          grep -q "Atria Dawn" docs/index.html
+          grep -q "keyAtria" docs/index.html
+          grep -q "api.atria-asi.ai" docs/index.html
+          grep -q "atria:" docs/index.html
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/index.html
+          # remove temporary restore scaffolding if present
+          git rm -r --ignore-unmatch docs/_restore || true
+          git rm --ignore-unmatch .github/workflows/assemble-docs.yml || true
+          git rm --ignore-unmatch .github/workflows/promote-docs.yml || true
+          if git diff --cached --quiet; then
+            echo "No changes"
+          else
+            git commit -m "Rebuild docs with Atria Dawn provider"
+            git push
+          fi
