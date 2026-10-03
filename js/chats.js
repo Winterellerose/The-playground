@@ -101,22 +101,51 @@ function ensureChat() {
 }
 // loadChat re-attaches #welcome (hidden) rather than just wiping the wrap: wiping
 // used to detach it, so the next selectModel() threw on the missing #welcomeModel.
-function loadChat(id) {
+// Guards the hydrate-then-render race: if the user opens another chat (or
+// deletes this one) while images are still hydrating, the stale load bails
+// out instead of yanking focus back to the old conversation.
+let chatLoadVersion = 0;
+async function loadChat(id) {
   stopStream();
-  const c = chats.find((x) => x.id === id);
-  if (!c) return;
+
+  const chat = chats.find((item) => item.id === id);
+  if (!chat) return;
+
+  const version = ++chatLoadVersion;
+
   activeChatId = id;
   localStorage.setItem("active_chat_id", id);
-  if ((c.messages||[]).some((m)=>(m.images||[]).some(idbRef))) { hydrateImages(c).then(() => loadChat(id)); return; }
-  if (c.model && MODELS[c.model]) selectModel(c.model, false);
-  chatWrap.innerHTML = "";
-  chatWrap.appendChild(welcome);
+
+  const hasStoredImages = (chat.messages || []).some((message) =>
+    (message.images || []).some(idbRef),
+  );
+
+  if (hasStoredImages) {
+    await hydrateImages(chat);
+  }
+
+  const superseded =
+    version !== chatLoadVersion ||
+    activeChatId !== id ||
+    !chats.includes(chat);
+
+  if (superseded) return;
+
+  if (chat.model && MODELS[chat.model]) {
+    selectModel(chat.model, false);
+  }
+
+  chatWrap.replaceChildren(welcome);
   welcome.style.display = "none";
-  c.messages.forEach((m, i) => {
-    m.role === "user"
-      ? addUserMsg(m.content, i, false, m.images, m.files)
-      : addAssistantMsg(m, i);
+
+  chat.messages.forEach((message, index) => {
+    if (message.role === "user") {
+      addUserMsg(message.content, index, false, message.images, message.files);
+    } else {
+      addAssistantMsg(message, index);
+    }
   });
+
   resetScrollPin();
   renderSidebar();
   syncChatPromptUI();
@@ -197,17 +226,65 @@ function clearChatPrompt() {
   $("chatSysPrompt").value = "";
   saveChatPrompt();
 }
-function exportChats() {
-  const blob = new Blob([JSON.stringify(chats, null, 2)], {
-    type: "application/json",
-  });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download =
-    "playground-chats-" + new Date().toISOString().slice(0, 10) + ".json";
-  a.click();
-  URL.revokeObjectURL(a.href);
-  logRot("Chats exported", "ok");
+async function exportChats() {
+  try {
+    // Work on a copy: resolving IndexedDB images must never mutate the live
+    // chat objects, and a failed export must not present a partial backup
+    // as if it were complete.
+    const snapshot = JSON.parse(JSON.stringify(chats));
+
+    for (const chat of snapshot) {
+      for (const message of chat.messages || []) {
+        if (!Array.isArray(message.images)) continue;
+
+        const images = [];
+
+        for (const image of message.images) {
+          const raw = idbRef(image) ? await idbGet(image.idb) : image;
+
+          const safe = safeImageDataUrl(raw);
+
+          if (!safe) {
+            throw new Error(
+              "No se pudo recuperar una imagen de la conversación: " +
+                (chat.title || "Sin título"),
+            );
+          }
+
+          images.push(safe);
+        }
+
+        message.images = images;
+      }
+    }
+
+    const blob = new Blob([JSON.stringify(snapshot, null, 2)], {
+      type: "application/json;charset=utf-8",
+    });
+
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+
+    a.href = url;
+    a.download =
+      "playground-chats-" + new Date().toISOString().slice(0, 10) + ".json";
+
+    document.body.appendChild(a);
+
+    try {
+      a.click();
+    } finally {
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
+    }
+
+    logRot("Exportación preparada con las imágenes incluidas", "ok");
+  } catch (error) {
+    showError(
+      "No se pudo completar la exportación. " +
+        (error instanceof Error ? error.message : "Error desconocido."),
+    );
+  }
 }
 const MAX_IMPORT_TEXT = 2 * 1024 * 1024;
 function importedSource(s) {
