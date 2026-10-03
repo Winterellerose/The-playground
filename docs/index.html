@@ -5607,7 +5607,7 @@ let selectedModel = localStorage.getItem("selected_model");
 let isStreaming = false,
   abortCtrl = null,
   landingDismissed = false,
-  userStop = false;
+  stopGen = -1; // generation explicitly stopped by the user (Stop button)
 window.isStreaming = false; // mirrored for testability; setStreamingUI keeps it in sync
 let rotState = {}; // session-only: {pid:{errors:n,backoffUntil:ts,bad:bool}}
 let streamGen = 0; // bumped on stop/chat switch to invalidate in-flight completions
@@ -7888,6 +7888,33 @@ async function idbDelete(id) { const db = await idbOpen(); return new Promise((r
 function idbRef(x) { return x && typeof x === "object" && typeof x.idb === "string" && /^image\/[\w+.-]+$/.test(x.mime || "") && typeof x.name === "string" && x.name.length <= 160; }
 async function moveLargeImages(chat) { for (const m of chat.messages || []) for (let i=0; i<(m.images||[]).length; i++) { const x=m.images[i]; if (typeof x !== "string" || x.length < IDB_ATTACH_LIMIT || !x.startsWith("data:image/")) continue; try { const mime=(/^data:([^;,]+)/.exec(x)||[])[1]||"image/jpeg", id=crypto.randomUUID(); await idbPut(id,x); m.images[i]={idb:id,mime,name:"image"}; } catch { idbWarn(); return; } } }
 async function hydrateImages(chat) { for (const m of chat.messages || []) for (let i=0; i<(m.images||[]).length; i++) if (idbRef(m.images[i])) { try { const data=await idbGet(m.images[i].idb); if (typeof data === "string") m.images[i]=data; else m.images.splice(i--,1); } catch { idbWarn(); m.images.splice(i--,1); } } }
+/* Resolve IndexedDB image refs on a COPY of wire history. The request builder
+   needs data-URL strings, but the live chat objects must keep their refs
+   (that's what keeps localStorage small). Images that can't be recovered are
+   dropped with a warning instead of being sent as garbage — wireHist would
+   otherwise serialize the ref object itself into the request. */
+async function hydrateHistImages(hist) {
+  const out = hist.map((m) => (m.images ? { ...m, images: m.images.slice() } : m));
+  for (const m of out) {
+    if (!m.images) continue;
+    const resolved = [];
+    for (const img of m.images) {
+      if (!idbRef(img)) {
+        resolved.push(img);
+        continue;
+      }
+      try {
+        const data = await idbGet(img.idb);
+        if (typeof data === "string" && data) resolved.push(data);
+        else logRot("Stored image unavailable — dropped from this request", "warn");
+      } catch {
+        logRot("Stored image unavailable — dropped from this request", "warn");
+      }
+    }
+    m.images = resolved;
+  }
+  return out;
+}
 
 /* ═══ js/search.js ═══ */
 "use strict";
@@ -8886,10 +8913,14 @@ function wireHist(hist, cfg) {
     };
   });
 }
-function cleanHistory(c, targetIdx) {
+function cleanHistory(c, targetIdx, extraChars = 0) {
   let h = c.messages.slice(0, targetIdx).filter((x) => (x.role === "user" && ((x.content||"").trim() || (x.images&&x.images.length) || (x.files&&x.files.length))) || (x.role === "assistant" && ((x.content||"").trim() || (x.thinking||"").trim())));
   const model = MODELS[c.model || selectedModel] || {}, ctx = parseCtx(model.ctx);
-  if (!ctx) h = h.slice(-60); else { const max=Math.max(1,(ctx-(parseInt($("maxTok").value)||8192))*.95); const tok=()=>h.reduce((n,x)=>n+Math.ceil(((x.content||"")+(x.thinking||"")).length/4),0); while(h.length>1 && tok()>max) h.shift(); if(h[0] && h[0].role === "assistant") h.shift(); }
+  // Attached file text ships inside the user message (userContentWithFiles),
+  // so it must count against the budget too — a pasted 100KB file is not
+  // "a small chat". extraChars covers the system prompt + web context.
+  const fileChars = (x) => (x.files || []).reduce((n, f) => n + String((f && f.text) || "").length, 0);
+  if (!ctx) h = h.slice(-60); else { const max=Math.max(1,(ctx-(parseInt($("maxTok").value)||8192))*.95); const tok=()=>Math.ceil(extraChars/4)+h.reduce((n,x)=>n+Math.ceil(((x.content||"")+(x.thinking||"")+fileChars(x)).length/4),0); while(h.length>1 && tok()>max) h.shift(); if(h[0] && h[0].role === "assistant") h.shift(); }
   return h.map((x) => { const o={role:x.role,content:x.content||""}; if(x.role === "user" && x.images) o.images=x.images; if(x.role === "user" && x.files) o.files=x.files; return o; });
 }
 
@@ -8929,9 +8960,12 @@ function setStreamingUI(on) {
     sendBtn.classList.remove("stopping");
   }
 }
-function stopStream() {
+function stopStream(userInitiated) {
   if (!isStreaming) return;
-  userStop = true;
+  // Only the Stop button marks its generation as user-stopped (partial
+  // content is kept). Chat switches, new/deleted chats and regenerates also
+  // invalidate the run via streamGen++, but their partials are discarded.
+  if (userInitiated) stopGen = streamGen;
   streamGen++;
   if (abortCtrl) {
     abortCtrl.abort();
@@ -8954,13 +8988,15 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
     return { content: "", thinking: "", meta: null, error: cfg.error };
   }
   const targetIdx = parseInt(msgDiv.dataset.idx);
-  const hist = cleanHistory(c, targetIdx);
   // Set up the abort controller BEFORE any async work so Stop works during
   // the web-search pre-fetch too (previously abortCtrl didn't exist yet).
   abortCtrl = new AbortController();
   const signal = abortCtrl.signal;
   const lastUser =
-    (hist.filter((x) => x.role === "user").pop() || {}).content || "";
+    (c.messages
+      .slice(0, targetIdx)
+      .filter((x) => x.role === "user")
+      .pop() || {}).content || "";
   const doSearch =
     cfg.webSearch === "on" ||
     (cfg.webSearch === "auto" && webNeedsSearch(lastUser));
@@ -8994,6 +9030,18 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
       };
     }
   }
+  // The context budget used to count only message text: the system prompt,
+  // attached files and web-search context all ride along with the request
+  // but were invisible to it — a "small" chat with a pasted file could
+  // silently blow past the model's limit. Count them here; image refs are
+  // resolved on a copy so the live messages keep their storage-friendly form.
+  const sysChars =
+    (($("sysPrompt") && $("sysPrompt").value.trim().length) || 0) +
+    chatSysText().length +
+    160; // composeSys date stamp + section labels
+  const hist = await hydrateHistImages(
+    cleanHistory(c, targetIdx, sysChars + (cfg.webContext || "").length),
+  );
   const { h, rb } = buildRequest(cfg, hist);
   const { pid, model: m } = cfg;
   let full = "",
@@ -9191,7 +9239,7 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
       // A user Stop aborts the in-flight fetch. Keep what streamed so far
       // (runCompletion commits it); other superseding events (new chat,
       // switch) discard it.
-      if (userStop && (full || think))
+      if (gen === stopGen && (full || think))
         return {
           content: full,
           thinking: think || undefined,
@@ -9219,7 +9267,7 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
     }
   }
   if (gen !== streamGen) {
-    if (userStop && (full || think))
+    if (gen === stopGen && (full || think))
       return {
         content: full,
         thinking: think || undefined,
@@ -9279,7 +9327,7 @@ async function runCompletion(c, regenIdx) {
   }
   chatWrap.querySelectorAll(".error-msg").forEach((e) => e.remove());
   const gen = ++streamGen;
-  userStop = false;
+  stopGen = -1;
   setStreamingUI(true);
   const idx = regenIdx !== undefined ? regenIdx : c.messages.length;
   const d = document.createElement("div");
@@ -9301,12 +9349,12 @@ async function runCompletion(c, regenIdx) {
   // A genuine supersede (new chat, switch chat, load) — discard the placeholder.
   if (gen !== streamGen && !result?.stopped) {
     d.remove();
-    userStop = false;
+    stopGen = -1;
     return;
   }
   if (result.aborted) {
     d.remove();
-    userStop = false;
+    stopGen = -1;
     return;
   }
   if (result.content || result.thinking) {
@@ -9362,7 +9410,7 @@ async function runCompletion(c, regenIdx) {
   } else {
     d.remove(); // never poison history with empty assistant turns
   }
-  userStop = false;
+  stopGen = -1;
 }
 async function sendMessage() {
   if (voiceOn && voiceRec) voiceRec.stop();
@@ -9930,7 +9978,7 @@ function bindEvents() {
   userInput.addEventListener("keydown", handleKey);
   // Send/Stop is state-driven — one listener, no swapping.
   sendBtn.addEventListener("click", () =>
-    isStreaming ? stopStream() : sendMessage(),
+    isStreaming ? stopStream(true) : sendMessage(),
   );
   // Welcome suggestions carry their prompt in data-suggest.
   welcome

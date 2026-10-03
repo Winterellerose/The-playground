@@ -115,7 +115,7 @@ function bindEvents() {
   userInput.addEventListener("keydown", handleKey);
   // Send/Stop is state-driven — one listener, no swapping.
   sendBtn.addEventListener("click", () =>
-    isStreaming ? stopStream() : sendMessage(),
+    isStreaming ? stopStream(true) : sendMessage(),
   );
   // Welcome suggestions carry their prompt in data-suggest.
   welcome

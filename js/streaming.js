@@ -33,9 +33,12 @@ function setStreamingUI(on) {
     sendBtn.classList.remove("stopping");
   }
 }
-function stopStream() {
+function stopStream(userInitiated) {
   if (!isStreaming) return;
-  userStop = true;
+  // Only the Stop button marks its generation as user-stopped (partial
+  // content is kept). Chat switches, new/deleted chats and regenerates also
+  // invalidate the run via streamGen++, but their partials are discarded.
+  if (userInitiated) stopGen = streamGen;
   streamGen++;
   if (abortCtrl) {
     abortCtrl.abort();
@@ -58,13 +61,15 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
     return { content: "", thinking: "", meta: null, error: cfg.error };
   }
   const targetIdx = parseInt(msgDiv.dataset.idx);
-  const hist = cleanHistory(c, targetIdx);
   // Set up the abort controller BEFORE any async work so Stop works during
   // the web-search pre-fetch too (previously abortCtrl didn't exist yet).
   abortCtrl = new AbortController();
   const signal = abortCtrl.signal;
   const lastUser =
-    (hist.filter((x) => x.role === "user").pop() || {}).content || "";
+    (c.messages
+      .slice(0, targetIdx)
+      .filter((x) => x.role === "user")
+      .pop() || {}).content || "";
   const doSearch =
     cfg.webSearch === "on" ||
     (cfg.webSearch === "auto" && webNeedsSearch(lastUser));
@@ -98,6 +103,18 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
       };
     }
   }
+  // The context budget used to count only message text: the system prompt,
+  // attached files and web-search context all ride along with the request
+  // but were invisible to it — a "small" chat with a pasted file could
+  // silently blow past the model's limit. Count them here; image refs are
+  // resolved on a copy so the live messages keep their storage-friendly form.
+  const sysChars =
+    (($("sysPrompt") && $("sysPrompt").value.trim().length) || 0) +
+    chatSysText().length +
+    160; // composeSys date stamp + section labels
+  const hist = await hydrateHistImages(
+    cleanHistory(c, targetIdx, sysChars + (cfg.webContext || "").length),
+  );
   const { h, rb } = buildRequest(cfg, hist);
   const { pid, model: m } = cfg;
   let full = "",
@@ -295,7 +312,7 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
       // A user Stop aborts the in-flight fetch. Keep what streamed so far
       // (runCompletion commits it); other superseding events (new chat,
       // switch) discard it.
-      if (userStop && (full || think))
+      if (gen === stopGen && (full || think))
         return {
           content: full,
           thinking: think || undefined,
@@ -323,7 +340,7 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
     }
   }
   if (gen !== streamGen) {
-    if (userStop && (full || think))
+    if (gen === stopGen && (full || think))
       return {
         content: full,
         thinking: think || undefined,
@@ -383,7 +400,7 @@ async function runCompletion(c, regenIdx) {
   }
   chatWrap.querySelectorAll(".error-msg").forEach((e) => e.remove());
   const gen = ++streamGen;
-  userStop = false;
+  stopGen = -1;
   setStreamingUI(true);
   const idx = regenIdx !== undefined ? regenIdx : c.messages.length;
   const d = document.createElement("div");
@@ -405,12 +422,12 @@ async function runCompletion(c, regenIdx) {
   // A genuine supersede (new chat, switch chat, load) — discard the placeholder.
   if (gen !== streamGen && !result?.stopped) {
     d.remove();
-    userStop = false;
+    stopGen = -1;
     return;
   }
   if (result.aborted) {
     d.remove();
-    userStop = false;
+    stopGen = -1;
     return;
   }
   if (result.content || result.thinking) {
@@ -466,7 +483,7 @@ async function runCompletion(c, regenIdx) {
   } else {
     d.remove(); // never poison history with empty assistant turns
   }
-  userStop = false;
+  stopGen = -1;
 }
 async function sendMessage() {
   if (voiceOn && voiceRec) voiceRec.stop();

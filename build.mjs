@@ -54,6 +54,20 @@ swap(ORDER.map(f => '<script src="js/' + f + '.js"></script>').join('\n'),
 if (/<script\s+src=/i.test(html)) fail('a <script src> tag survived inlining');
 if (/<link(?![^>]+fonts\.googleapis)[^>]+stylesheet/i.test(html)) fail('the stylesheet <link> survived inlining');
 
+/* The dev CSP allows 'self' for the modular <script src>/<link> tags. The
+   artifact is fully inlined, so tighten it back — and fail loudly if the
+   dev policy ever survives into the shipped file. */
+html = html.replace(
+  "script-src 'unsafe-inline' 'self'",
+  "script-src 'unsafe-inline'",
+);
+html = html.replace(
+  "style-src 'unsafe-inline' 'self' https://fonts.googleapis.com",
+  "style-src 'unsafe-inline' https://fonts.googleapis.com",
+);
+if (/(script|style)-src[^;]*'self'/.test(html))
+  fail("dev CSP ('self') survived into the built artifact");
+
 mkdirSync(join(ROOT, 'docs'), { recursive: true });
 writeFileSync(join(ROOT, 'docs', 'index.html'), html);
 
