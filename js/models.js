@@ -430,7 +430,7 @@ function mpCardHtml(id, m) {
     m.adaptive ? "🧠 adaptive" : m.thinking ? "🧠 thinking" : null,
   ]
     .filter(Boolean)
-    .map((t) => `<span class="mp-tag">${t}</span>`)
+    .map((t) => `<span class="mp-tag">${esc(t)}</span>`)
     .join("");
   const priceTag = m.isFree
     ? `<span class="mp-card-free-tag">FREE</span>`
@@ -438,7 +438,7 @@ function mpCardHtml(id, m) {
   const del = m.custom
     ? `<button class="sb-del" style="opacity:1;position:static;font-size:20px;line-height:1;padding:2px 8px;align-self:center" data-act="remove-custom" data-id="${esc(id)}" title="Remove this custom model" aria-label="Remove custom model ${esc(m.name)}">×</button>`
     : "";
-  return `<div class="mp-card${id === selectedModel ? " selected" : ""}" data-mid="${id}" data-name="${esc(((m.name || "") + " " + (m.apiId || "") + " " + (m.provider || "") + " " + (m.desc || "")).toLowerCase())}" tabindex="0" role="button" aria-pressed="${id === selectedModel ? "true" : "false"}"><div class="mp-card-top"><span class="mp-card-name">${esc(m.name)} ${priceTag}</span>${del}<span class="intel-dots">${dots}</span></div>${tags ? `<div class="mp-card-tags">${tags}</div>` : ""}<div class="mp-card-desc">${esc(m.desc || "")}</div></div>`;
+  return `<div class="mp-card${id === selectedModel ? " selected" : ""}" data-mid="${esc(id)}" data-name="${esc(((m.name || "") + " " + (m.apiId || "") + " " + (m.provider || "") + " " + (m.desc || "")).toLowerCase())}" tabindex="0" role="button" aria-pressed="${id === selectedModel ? "true" : "false"}"><div class="mp-card-top"><span class="mp-card-name">${esc(m.name)} ${priceTag}</span>${del}<span class="intel-dots">${dots}</span></div>${tags ? `<div class="mp-card-tags">${tags}</div>` : ""}<div class="mp-card-desc">${esc(m.desc || "")}</div></div>`;
 }
 function sortModels(arr) {
   // Featured first by intel, then alphabetical; selected model always on top.
@@ -501,13 +501,9 @@ function renderModelPicker() {
   const totalAll = Object.values(MODELS).length;
   const sections = GROUPS.map((g) => {
     if (g.search) {
-      // Customs are included here on purpose: anything you added must be
-      // findable by search — otherwise a bad add can't be located and removed.
-      const models = sortModels(
-        Object.entries(MODELS).filter(
-          ([, m]) => m.group === "search" || m.live || m.custom,
-        ),
-      );
+      // Every model is searchable — including curated/featured rows, which
+      // used to vanish from results the moment you typed their name.
+      const models = sortModels(Object.entries(MODELS));
       const header = `<div class="mp-section-header"><span class="mp-section-icon">${g.icon}</span><div class="mp-provider"><span class="mp-provider-name">${g.name}</span><span class="mp-provider-blurb">${g.blurb}</span></div><span class="mp-provider-count">${models.length}</span></div>`;
       return `<div class="mp-section mp-search-section" data-g="${g.id}" style="display:none">${header}<div class="mp-cards">${models.map(([id, m]) => mpCardHtml(id, m)).join("")}<div class="mp-noresults" style="display:none">No models match “${esc(mpQuery)}”.</div></div></div>`;
     }

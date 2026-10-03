@@ -18,7 +18,14 @@ function applyCatalog(list) {
   const realMap = new Map();
   list.forEach((mo) => realMap.set(mo.id, mo));
   Object.keys(MODELS).forEach((k) => {
-    if (MODELS[k].live) delete MODELS[k];
+    const m = MODELS[k];
+    const fromOpenRouter =
+      m.provider === "openrouter" || m.provider === "openrouter_paid";
+    // Only OpenRouter's own live rows are rebuilt here — native live rows
+    // (Groq, Cerebras, …) belong to applyNativeCatalog and must survive.
+    if (m.live && !m.native && fromOpenRouter) {
+      delete MODELS[k];
+    }
   });
   list.forEach((mo) => {
     if (curated.has(mo.id)) return;
@@ -202,7 +209,13 @@ function parseNativeModels(pid, data) {
 function applyNativeCatalog(pid, list) {
   if (!Array.isArray(list) || !list.length) return;
   const r = REG[pid];
-  const known = new Set(Object.values(MODELS).map((m) => m.apiId));
+  // Dedupe against THIS provider's own rows only: the same id served by
+  // two providers is two different routes and must not hide each other.
+  const known = new Set(
+    Object.values(MODELS)
+      .filter((m) => m.provider === pid)
+      .map((m) => m.apiId),
+  );
   let added = 0;
   for (const mo of list) {
     if (!mo.id || known.has(mo.id)) continue;
