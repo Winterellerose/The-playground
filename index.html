@@ -5,12 +5,26 @@
 <link rel="apple-touch-icon" href="icons/icon-192.png">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<!-- CSP: the single-file artifact ships all scripts inline, so 'unsafe-inline'
-     on script-src is inherent; the value is in connect-src, which pins every
-     host the app may talk to (REG providers + search APIs + local servers) so
-     injected script can't exfiltrate keys elsewhere. Adding a provider in
-     js/config.js means adding its origin here too. -->
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'self'; style-src 'unsafe-inline' 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src https: data:; connect-src https://openrouter.ai https://api.groq.com https://api.cerebras.ai https://generativelanguage.googleapis.com https://api.mistral.ai https://api.cohere.com https://integrate.api.nvidia.com http://localhost:8765 http://127.0.0.1:8765 https://nvidia-relay.genesisrosario159.workers.dev https://api.deepseek.com https://api.z.ai https://api.anthropic.com https://api.openai.com https://api.sambanova.ai https://api.atria-asi.ai https://api.tavily.com https://google.serper.dev https://api.search.brave.com http://localhost:11434 http://localhost:1234; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
+<!--
+  CSP notes:
+  • This app ships as a set of external js/*.js files (see the <script src=…> tags
+    below), so 'self' on script-src covers them. 'unsafe-inline' is retained because
+    the streaming layer injects <script> blocks at runtime for provider callbacks;
+    without it the app breaks. The real defence is connect-src, which pins every
+    host the app may talk to (REG providers + search APIs + local relay servers) so
+    that even if script gets injected it cannot exfiltrate keys to an arbitrary
+    endpoint. When you add a provider in js/config.js, add its origin to connect-src
+    here as well.
+  • img-src allows 'self' (local icons), data: (base64 attachments you've already
+    read locally), and https: (markdown images in model output / search results).
+    Images are a rendering surface, not a network-request channel — the exfil risk
+    they carry is negligible compared to the connect-src surface this CSP locks down.
+  • style-src keeps 'unsafe-inline' because the app sets el.style.* and
+    document.styleSheets in a few places (syntax-highlighting theme swap,
+    preview-strip sizing). A full build step could move those to app.css and
+    drop the inline rule, but for a single-artifact ship it's the pragmatic call.
+-->
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline' 'self'; style-src 'unsafe-inline' 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:; connect-src https://api.groq.com https://api.cerebras.ai https://generativelanguage.googleapis.com https://api.mistral.ai https://api.cohere.com https://integrate.api.nvidia.com http://localhost:8765 http://127.0.0.1:8765 https://nvidia-relay.genesisrosario159.workers.dev https://api.deepseek.com https://api.anthropic.com https://api.openai.com https://api.sambanova.ai https://api.atria-asi.ai https://api.tavily.com https://google.serper.dev https://api.search.brave.com http://localhost:11434 http://localhost:1234; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'">
 <title>The Playground — Multi-Provider AI Studio</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -23,7 +37,7 @@
 </head>
 <body>
 
-<div class="landing" id="landing" role="button" tabindex="0" aria-label="Enter the playground">
+<div class="landing" id="landing" role="button" tabindex="0" aria-label="Enter the playground" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
   <div class="landing-inner">
     <svg class="landing-prism" viewBox="0 0 60 60"><defs><linearGradient id="lg1" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#7ec8b4"/><stop offset="50%" stop-color="#d4c66a"/><stop offset="100%" stop-color="#e89c6c"/></linearGradient></defs><polygon points="30,52 6,8 54,8" fill="url(#lg1)"/></svg>
     <div class="landing-label">Initializing</div>
@@ -64,7 +78,7 @@
           <div class="sb-field"><span>Thinking / Reasoning</span><div class="toggle on" id="thinkingToggle" data-act="toggle-thinking" role="switch" aria-checked="true" aria-label="Thinking / Reasoning" tabindex="0"></div></div>
           <div class="sb-field"><label for="effortSelect">Effort</label><select id="effortSelect"><option value="low">low</option><option value="medium">medium</option><option value="high" selected>high</option><option value="max">max</option></select></div>
           <div class="sb-field"><label for="tempSelect">Temperature</label><select id="tempSelect"><option value="0.3">0.3</option><option value="0.6">0.6</option><option value="0.8">0.8</option><option value="1.0" selected>1.0</option></select></div>
-          <div class="sb-field"><label for="maxTok">Max output tokens</label><input type="number" id="maxTok" value="8192" min="256" max="128000" step="256" style="width:90px"></div>
+          <div class="sb-field"><label for="maxTok">Max output tokens</label><input type="number" id="maxTok" value="8192" min="256" max="128000" step="256" style="width:90px" title="Per-model limits may be lower — the rotation layer clamps to each model's actual cap before sending.">
           <div class="sb-field"><label for="extrasMode">Titles / follow-ups</label><select id="extrasMode"><option value="off">off</option><option value="free" selected>free models only</option><option value="always">always (may use credits)</option></select></div>
         </div>
       </div>
@@ -72,7 +86,7 @@
       <div>
         <div class="key-section-header"><span class="key-section-name free">Free APIs</span><span class="key-section-count" id="freeKeyCount">0 keys set</span></div>
         <div id="freeKeys"></div>
-        <p class="sb-key-help">Free tiers: OpenRouter 20 RPM · Groq 30 RPM · Cerebras 30 RPM · Gemini ~10 RPM · Mistral 1 rps · Cohere trial · NVIDIA 40 RPM (needs a local CORS relay — their API blocks browser calls) · DeepSeek pay-as-you-go (very cheap).</p>
+        <p class="sb-key-help">Free tiers: 20 RPM · Groq 30 RPM · Cerebras 30 RPM · Gemini ~10 RPM · Mistral 1 rps · Cohere trial · NVIDIA 40 RPM (needs a local CORS relay — their API blocks browser calls) · DeepSeek pay-as-you-go (very cheap).</p>
       </div>
 
       <div>
@@ -81,7 +95,7 @@
         <p class="sb-key-help">Free keys are tried first; paid keys act as fallback when free limits hit.</p>
       </div>
 
-      <p class="sec-note">⚠ Security: keys are stored in this browser's localStorage and sent directly from your device to each provider. Never use this file on a shared machine. Stealth/anonymous-provider models (OpenRouter has retired several, e.g. owl-alpha and ox-alpha) are run by unknown parties who may retain prompts — don't send confidential data.</p>
+      <p class="sec-note">⚠ Security: keys are stored in this browser's localStorage and sent directly from your device to each provider. Never use this file on a shared machine. Some providers in the catalog (e.g. those behind the anonymous/stealth tier, including models that have since been retired such as owl-alpha and ox-alpha) are operated by unknown third parties who may retain prompts — don't send confidential data to them.</p>
 
       <div>
         <div class="sb-sect-label">Rotation Log</div>
@@ -127,7 +141,7 @@
   </div>
 </div>
 
-<!-- Per-chat system prompt (v2.8.3): layers on top of the global prompt for one conversation only -->
+<!-- Per-chat system prompt: layers on top of the global prompt for one conversation only -->
 <div class="st-overlay" id="cpOverlay" data-act="close-chat-prompt">
   <div class="st-modal" role="dialog" aria-modal="true" aria-labelledby="cpTitle" tabindex="-1">
     <div class="st-head"><h3 id="cpTitle">Chat system prompt</h3><button class="st-close" data-act="close-chat-prompt" aria-label="Close chat system prompt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button></div>
@@ -192,7 +206,7 @@
     <textarea id="userInput" placeholder="Send a message…" rows="1" aria-label="Message"></textarea>
     <button class="send-btn" id="sendBtn">Send <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg></button>
   </div>
-  <div class="input-hint" style="display:none">Enter to send · Shift+Enter newline · Ctrl/Cmd+K models · Ctrl/Cmd+Shift+O new chat · Tab indents · Free keys rotate automatically · Drop / paste files · images on VISION models</div>
+  <div class="input-hint">Enter to send · Shift+Enter newline · Ctrl/Cmd+K models · Ctrl/Cmd+Shift+O new chat · Tab indents · Free keys rotate automatically · Drop / paste files · images on VISION models</div>
 </div>
 <input type="file" id="imgFile" accept="image/*,.txt,.md,.markdown,.json,.csv,.js,.mjs,.cjs,.ts,.tsx,.jsx,.py,.rb,.go,.rs,.java,.c,.h,.hpp,.hh,.cpp,.cc,.cxx,.cs,.html,.htm,.css,.xml,.yml,.yaml,.sql,.sh,.bash,.zsh,.ksh" multiple style="display:none">
 <div class="drop-overlay" id="dropOverlay"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg><span>Drop files or images to attach</span></div>
