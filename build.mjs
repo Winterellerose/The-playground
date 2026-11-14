@@ -51,8 +51,12 @@ swap('<script src="js/vendor/purify.min.js"></script>', '<script>\n' + purifySrc
 swap(ORDER.map(f => '<script src="js/' + f + '.js"></script>').join('\n'),
     '<!-- built from ' + ORDER.length + ' files — edit the sources, not this file -->\n<script>\n' + appJs + '\n</script>');
 
-if (/<script\s+src=/i.test(html)) fail('a <script src> tag survived inlining');
-if (/<link(?![^>]+fonts\.googleapis)[^>]+stylesheet/i.test(html)) fail('the stylesheet <link> survived inlining');
+/* Post-inline checks ignore HTML comments: the CSP notes in index.html
+   mention "<script src=…>" and "'self' on script-src" in prose, which
+   would otherwise trip these guards even though no real tag survived. */
+const stripComments = s => s.replace(/<!--[\s\S]*?-->/g, '');
+if (/<script\s+src=/i.test(stripComments(html))) fail('a <script src> tag survived inlining');
+if (/<link(?![^>]+fonts\.googleapis)[^>]+stylesheet/i.test(stripComments(html))) fail('the stylesheet <link> survived inlining');
 
 /* The dev CSP allows 'self' for the modular <script src>/<link> tags. The
    artifact is fully inlined, so tighten it back — and fail loudly if the
@@ -65,7 +69,7 @@ html = html.replace(
   "style-src 'unsafe-inline' 'self' https://fonts.googleapis.com",
   "style-src 'unsafe-inline' https://fonts.googleapis.com",
 );
-if (/(script|style)-src[^;]*'self'/.test(html))
+if (/(script|style)-src[^;]*'self'/.test(stripComments(html)))
   fail("dev CSP ('self') survived into the built artifact");
 
 mkdirSync(join(ROOT, 'docs'), { recursive: true });
