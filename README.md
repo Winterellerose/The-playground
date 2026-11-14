@@ -4,6 +4,11 @@ A private, multi-provider AI studio built into one portable single-file artifact
 ## Quick start
 `npm run build`, then open `docs/index.html` directly. Use `npm run dev` for a localhost server.
 
+## Deploy on Netlify
+Connect the private GitHub repository to Netlify and import it as a new project. `netlify.toml` sets the build command (`npm run build`) and publish directory (`docs`). Select the branch you want Netlify to deploy; merge the configuration into that branch first if necessary.
+
+A private GitHub repository does **not** make the deployed site private. Configure site access protection through Netlify if your plan supports it, or use another access-control solution before publishing if the site must require login. API keys entered into the app remain in each user's browser; do not add keys to the repository.
+
 ## Features
 Provider rotation, live catalogs, vision and text attachments, web search, per-chat prompts, full-text search, JSON chat export, speech input, keyboard shortcuts, usage/cost estimates, PWA offline shell, and local models.
 
