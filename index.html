@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <!--
   CSP notes:
-  • This app ships as a set of external js/*.js files (see the <script src=…> tags
+  • This app ships as a set of external js/*.js files (see the script tags
     below), so 'self' on script-src covers them. 'unsafe-inline' is retained because
     the streaming layer injects <script> blocks at runtime for provider callbacks;
     without it the app breaks. The real defence is connect-src, which pins every
@@ -37,7 +37,7 @@
 </head>
 <body>
 
-<div class="landing" id="landing" role="button" tabindex="0" aria-label="Enter the playground" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();this.click();}">
+<div class="landing" id="landing" role="button" tabindex="0" aria-label="Enter the playground">
   <div class="landing-inner">
     <svg class="landing-prism" viewBox="0 0 60 60"><defs><linearGradient id="lg1" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stop-color="#7ec8b4"/><stop offset="50%" stop-color="#d4c66a"/><stop offset="100%" stop-color="#e89c6c"/></linearGradient></defs><polygon points="30,52 6,8 54,8" fill="url(#lg1)"/></svg>
     <div class="landing-label">Initializing</div>
