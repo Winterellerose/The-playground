@@ -655,6 +655,12 @@ header {
 .st-overlay {
   z-index: 210;
 }
+/* Model picker sits above Settings (and the chat prompt): it is opened from
+   the main view, including while Settings is open, so it must be the top
+   dialog. Escape handling closes the picker first, matching this order. */
+.mp-overlay {
+  z-index: 220;
+}
 .mp-overlay.open,
 .st-overlay.open {
   opacity: 1;
