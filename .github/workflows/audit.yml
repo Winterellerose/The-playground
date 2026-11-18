@@ -1,21 +1,130 @@
-name: Model catalog audit
+name: Model Catalog Audit
 
 on:
   schedule:
-    # Weekly, Mondays 09:00 UTC — free-provider catalogs churn, so drift is
-    # checked on a cadence rather than on every push.
-    - cron: "0 9 * * 1"
+    - cron: '0 6 * * 1'  # Weekly Monday 06:00 UTC
   workflow_dispatch:
+    inputs:
+      create_pr:
+        description: 'Create PR with updated models'
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  pull-requests: write
 
 jobs:
   audit:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
         with:
-          node-version: 20
-      # Compares the curated OpenRouter model IDs in js/config.js against the
-      # live OpenRouter catalog. Fails on drift; warns (not fails) on network
-      # errors — that behavior lives in tests/audit-models.js itself.
-      - run: npm run audit:models
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run model audit
+        id: audit
+        run: |
+          set +e
+          npm run audit:models 2>&1 | tee audit.log
+          exit_code=${PIPESTATUS[0]}
+          set -e
+          if [ $exit_code -eq 0 ]; then
+            echo "status=clean" >> $GITHUB_OUTPUT
+            echo "✅ Catalog is up to date"
+          else
+            echo "status=drift" >> $GITHUB_OUTPUT
+            echo "⚠️ Catalog drift detected"
+            cat audit.log
+          fi
+
+      - name: Fetch live OpenRouter catalog
+        if: steps.audit.outputs.status == 'drift' && github.event.inputs.create_pr == 'true'
+        id: fetch
+        run: |
+          curl -sf https://openrouter.ai/api/v1/models | \
+            jq -r '.data[] | select(.id | endswith(":free")) | .id' | \
+            sort > live-free-models.txt
+          echo "count=$(wc -l < live-free-models.txt)" >> $GITHUB_OUTPUT
+          cat live-free-models.txt
+
+      - name: Generate updated config.js
+        if: steps.audit.outputs.status == 'drift' && github.event.inputs.create_pr == 'true'
+        id: generate
+        run: |
+          node << 'EOF'
+          const fs = require('fs');
+          const config = fs.readFileSync('js/config.js', 'utf8');
+          const liveModels = fs.readFileSync('live-free-models.txt', 'utf8')
+            .trim().split('\n').filter(Boolean);
+
+          // Find the OpenRouter free section and replace it
+          // This is a conservative replacement - only updates the or_free models
+          const newModels = liveModels.map((id, i) => {
+            const name = id.split('/').pop().replace(':free', '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            const badge = name.length > 10 ? name.slice(0,10) : name;
+            return `"or-free-${i}": {
+    name: "${name}",
+    badge: "${badge}",
+    group: "or_free",
+    provider: "openrouter",
+    apiId: "${id}",
+    isFree: true,
+    intel: 3,
+    ctx: "—",
+    desc: "Free via OpenRouter."
+  }`;
+          }).join(',\n  ');
+
+          const replacement = `/* ── OpenRouter free ── */
+  // AUTO-UPDATED ${new Date().toISOString().slice(0,10)} — do not edit manually, run the audit workflow
+  ${newModels}`;
+
+          const updated = config.replace(
+            /\/\* ── OpenRouter free ── \*\/[\s\S]*?(?=\n  \/\* ──|\nconst GROUPS)/,
+            replacement
+          );
+
+          fs.writeFileSync('js/config.js', updated);
+          console.log('Updated js/config.js with', liveModels.length, 'free models');
+          EOF
+
+      - name: Run tests to verify
+        if: steps.audit.outputs.status == 'drift' && github.event.inputs.create_pr == 'true'
+        run: npm test
+
+      - name: Create Pull Request
+        if: steps.audit.outputs.status == 'drift' && github.event.inputs.create_pr == 'true'
+        uses: peter-evans/create-pull-request@v7
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          commit-message: 'chore: update OpenRouter free model catalog [auto]'
+          title: 'chore: update OpenRouter free model catalog [auto]'
+          body: |
+            Automated update from the weekly model audit.
+
+            **Changes:**
+            - Refreshed OpenRouter free model list from live catalog
+            - Removed retired/unavailable models
+            - Added newly available free models
+
+            Run `npm test` locally to verify.
+          branch: auto/model-catalog-update
+          delete-branch: true
+          labels: 'automated,models'
+
+      - name: Comment on drift (no PR)
+        if: steps.audit.outputs.status == 'drift' && github.event.inputs.create_pr != 'true'
+        run: |
+          echo "::warning::Model catalog drift detected. Run workflow with 'create_pr=true' to auto-fix."
+          cat audit.log

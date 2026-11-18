@@ -12,12 +12,22 @@
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
+import { execSync } from 'node:child_process';
 
 const ROOT = fileURLToPath(new URL('.', import.meta.url));
 const read = rel => readFileSync(join(ROOT, rel), 'utf8');
 const fail = m => { console.error('\nBUILD FAILED: ' + m + '\n'); process.exit(1) };
 
+/* Version info — embedded in the artifact and written to docs/version.txt */
+const pkg = JSON.parse(read('package.json'));
+const version = pkg.version;
+let commit = 'unknown';
+try { commit = execSync('git rev-parse --short HEAD', { cwd: ROOT, encoding: 'utf8' }).trim() } catch {}
+const buildInfo = `<!-- Built: ${new Date().toISOString()} | v${version} | ${commit} -->`;
+
 const ORDER = ['config', 'state', 'utils', 'markdown', 'catalog', 'keys', 'rotation', 'models', 'attachments', 'idb', 'search', 'chats', 'messages', 'api', 'streaming', 'extras', 'modals', 'events', 'app', 'pwa'];
+
+const scriptTags = ORDER.map(f => '<script src="js/' + f + '.js"></script>').join('\n');
 
 const css = read('css/app.css');
 const markedSrc = read('js/vendor/marked.umd.js');
@@ -48,8 +58,14 @@ swap('<link rel="stylesheet" href="js/vendor/github-dark-dimmed.min.css">', '<st
 swap('<script src="js/vendor/highlight.min.js"></script>', '<script>\n' + hljsJs + '\n</script>');
 swap('<script src="js/vendor/marked.umd.js"></script>', '<script>\n' + markedSrc + '\n</script>');
 swap('<script src="js/vendor/purify.min.js"></script>', '<script>\n' + purifySrc + '\n</script>');
-swap(ORDER.map(f => '<script src="js/' + f + '.js"></script>').join('\n'),
-    '<!-- built from ' + ORDER.length + ' files — edit the sources, not this file -->\n<script>\n' + appJs + '\n</script>');
+/* Match the script block regardless of line ending style (\n or \r\n). */
+const scriptBlockRegex = new RegExp(
+  ORDER.map(f => '<script src="js/' + f + '\\.js"></script>').join('\\r?\\n')
+);
+const scriptBlockMatch = html.match(scriptBlockRegex);
+if (!scriptBlockMatch) fail('script block not found in index.html (check line endings / order)');
+html = html.replace(scriptBlockMatch[0],
+  '<!-- built from ' + ORDER.length + ' files — edit the sources, not this file -->\n<script>\n' + appJs + '\n</script>');
 
 /* Post-inline checks ignore HTML comments: the CSP notes in index.html
    mention "<script src=…>" and "'self' on script-src" in prose, which
@@ -72,8 +88,14 @@ html = html.replace(
 if (/(script|style)-src[^;]*'self'/.test(stripComments(html)))
   fail("dev CSP ('self') survived into the built artifact");
 
+/* Inject build info into the HTML (as a comment, visible in DevTools) */
+html = html.replace('</head>', buildInfo + '\n</head>');
+
 mkdirSync(join(ROOT, 'docs'), { recursive: true });
 writeFileSync(join(ROOT, 'docs', 'index.html'), html);
+
+/* Write version.txt for deploy verification */
+writeFileSync(join(ROOT, 'docs', 'version.txt'), `version: ${version}\ncommit: ${commit}\nbuilt: ${new Date().toISOString()}\n`);
 
 /* Copy PWA assets (manifest, service worker, icons) into docs/ so the
    Pages deploy serves them alongside the single-file artifact. The app

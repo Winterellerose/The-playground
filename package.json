@@ -2,11 +2,21 @@
   "name": "the-playground",
   "version": "3.0.3",
   "private": true,
-  "description": "Multi-provider AI studio \u2014 single-file artifact built from modular source",
+  "type": "module",
+  "description": "Multi-provider AI studio — single-file artifact built from modular source",
   "scripts": {
     "build": "node build.mjs",
     "dev": "python3 -m http.server 8000",
-    "test": "node tests/run.js",
-    "audit:models": "node tests/audit-models.js"
+    "test": "node tests/run.cjs",
+    "audit:models": "node tests/audit-models.cjs",
+    "verify:vendor": "node scripts/verify-vendor.js",
+    "relay:nim": "node nim-cors-proxy.js",
+    "relay:nim:port": "node nim-cors-proxy.js --port"
+  },
+  "devDependencies": {
+    "dompurify": "3.2.4",
+    "highlight.js": "11.11.1",
+    "marked": "15.0.7",
+    "tar": "^7.5.23"
   }
 }

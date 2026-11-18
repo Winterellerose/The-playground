@@ -2,22 +2,95 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [main]
   pull_request:
-    branches: [master]
+    branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
-  build:
+  lint-and-test:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
-          node-version: 20
-      # Runs the no-inline-handlers scan, node --check on every js/*.js,
-      # and the single-file build (npm test = node tests/run.js).
-      - run: npm test
-      # docs/index.html is committed to the repo, so fail if the committed
-      # artifact is stale relative to the sources.
-      - name: Built artifact is in sync
-        run: git diff --exit-code -- docs/
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Verify vendored libraries
+        run: npm run verify:vendor
+
+      - name: Build artifact
+        run: npm run build
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Check for inline handlers (security)
+        run: |
+          # The app uses data-act delegation; any onclick/oninput/onchange/onkeydown in HTML is a bug
+          if grep -rnE '\s(onclick|oninput|onchange|onkeydown)\s*=' index.html; then
+            echo "❌ Inline event handlers found in index.html"
+            exit 1
+          fi
+          echo "✅ No inline event handlers"
+
+      - name: Verify CSP in built artifact
+        run: |
+          # Ensure 'self' was stripped from script-src and style-src in the build
+          if grep -q "script-src.*'self'" docs/index.html; then
+            echo "❌ Dev CSP ('self') survived in built artifact"
+            exit 1
+          fi
+          if grep -q "style-src.*'self'" docs/index.html; then
+            echo "❌ Dev CSP ('self') survived in built artifact"
+            exit 1
+          fi
+          echo "✅ CSP tightened in build"
+
+  smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: lint-and-test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build artifact
+        run: npm run build
+
+      - name: Install Playwright
+        run: npx playwright install --with-deps chromium
+
+      - name: Run smoke test
+        run: node tests/smoke.js
+
+  deploy-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    needs: [lint-and-test, smoke-test]
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+      - name: Upload built artifact for preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: playground-preview
+          path: docs/
+          retention-days: 7

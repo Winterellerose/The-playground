@@ -1,0 +1,17 @@
+{
+  "marked": {
+    "file": "marked.umd.js",
+    "sha256": "ae501969d4c7f1b433d80db12aea7e4228291e18fa8121e46337c73cb09c8683",
+    "version": "15.0.7"
+  },
+  "dompurify": {
+    "file": "purify.min.js",
+    "sha256": "8eb41b658831fab175fad9bcd00fcb2d84e0ed3a25a55053d4ecd4444b8b43a0",
+    "version": "3.2.4"
+  },
+  "highlight.js-css": {
+    "file": "github-dark-dimmed.min.css",
+    "sha256": "bc1116bfba58ee83794d53b8bd08e5ab13cba81bf03454cf67d6cfe435033cae",
+    "version": "11.11.1"
+  }
+}
