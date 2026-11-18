@@ -21,7 +21,12 @@ const VENDORS = [
   { name: 'dompurify', file: 'purify.min.js', pkg: 'dompurify@3.2.4', extract: 'dist/purify.min.js' },
   // highlight.js: npm package has source only; built min is generated at release
   // CSS theme is included in npm package
-  { name: 'highlight.js-css', file: 'github-dark-dimmed.min.css', pkg: 'highlight.js@11.11.1', extract: 'styles/github-dark-dimmed.min.css' },
+  {
+    name: 'highlight.js-css',
+    file: 'github-dark-dimmed.min.css',
+    pkg: 'highlight.js@11.11.1',
+    extract: 'styles/github-dark-dimmed.min.css',
+  },
 ];
 
 function sha256(buf) {
@@ -35,7 +40,9 @@ async function fetchNpmFile(pkg, extractPath) {
 
   // npm pack outputs tarball to the pack destination
   const packOutput = execSync(`npm pack "${pkg}" --pack-destination "${tmpDir}"`, {
-    encoding: 'utf8', cwd: ROOT, stdio: ['ignore', 'pipe', 'ignore']
+    encoding: 'utf8',
+    cwd: ROOT,
+    stdio: ['ignore', 'pipe', 'ignore'],
   }).trim();
 
   const tgzName = packOutput.split('\n').pop().trim();
@@ -112,4 +119,7 @@ async function main() {
   console.log('\n✅ All vendored libraries match npm artifacts');
 }
 
-main().catch(e => { console.error(e); process.exit(1); });
+main().catch(e => {
+  console.error(e);
+  process.exit(1);
+});

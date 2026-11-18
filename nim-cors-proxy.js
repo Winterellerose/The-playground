@@ -24,9 +24,9 @@ import { createHash } from 'node:crypto';
 const TARGET = 'https://integrate.api.nvidia.com';
 const DEFAULT_PORT = 8765;
 const ALLOWED_ORIGINS = [
-  'http://localhost:8000',  // npm run dev
+  'http://localhost:8000', // npm run dev
   'http://127.0.0.1:8000',
-  'http://localhost:8765',  // self
+  'http://localhost:8765', // self
   'http://127.0.0.1:8765',
   // file:// origin is 'null' — handled separately
 ];
@@ -49,7 +49,7 @@ function corsHeaders(origin) {
   if (origin === 'null' || ALLOWED_ORIGINS.includes(origin)) {
     h['Access-Control-Allow-Origin'] = origin;
   } else if (origin?.startsWith('http://localhost:') || origin?.startsWith('http://127.0.0.1:')) {
-    h['Access-Control-Allow-Origin'] = origin;  // allow any localhost port
+    h['Access-Control-Allow-Origin'] = origin; // allow any localhost port
   }
   return h;
 }
@@ -97,7 +97,7 @@ const server = createServer(async (req, res) => {
     headers: {
       ...req.headers,
       host: targetUrl.hostname,
-      origin: target,  // forward our origin to NVIDIA
+      origin: target, // forward our origin to NVIDIA
     },
   };
 

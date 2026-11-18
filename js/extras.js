@@ -1,18 +1,16 @@
-"use strict";
+'use strict';
 /* ═══ extras.js — smart titles + follow-up chips ═══ */
 
 /* ── Smart extras: one cheap non-streaming call → 5-word title + 3 follow-up chips ── */
 function getExtrasMode() {
-  return localStorage.getItem("pg_extras_mode") || "free";
+  return localStorage.getItem('pg_extras_mode') || 'free';
 }
 function metaCandidates(m, mode = getExtrasMode()) {
-  if (!m || mode === "off") return [];
-  const pool = REG[m.provider].type === "free" ? FREE_PIDS : PAID_PIDS;
+  if (!m || mode === 'off') return [];
+  const pool = REG[m.provider].type === 'free' ? FREE_PIDS : PAID_PIDS;
   let out = [];
-  const push = (pid) => {
-    const freeAllowed =
-      mode === "always" ||
-      (m.isFree && REG[pid].type === "free" && !REG[pid].metered);
+  const push = pid => {
+    const freeAllowed = mode === 'always' || (m.isFree && REG[pid].type === 'free' && !REG[pid].metered);
     if (
       freeAllowed &&
       !out.includes(pid) &&
@@ -40,39 +38,38 @@ async function metaChat(messages, m, mode = getExtrasMode()) {
     try {
       const st = REG[pid].style,
         modelId = idFor(pid, m);
-      let h = { "Content-Type": "application/json" },
+      let h = { 'Content-Type': 'application/json' },
         body = { ...body0, model: modelId };
-      if (st === "anthropic") {
+      if (st === 'anthropic') {
         h = {
-          "Content-Type": "application/json",
-          "x-api-key": getKey(pid),
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true",
+          'Content-Type': 'application/json',
+          'x-api-key': getKey(pid),
+          'anthropic-version': '2023-06-01',
+          'anthropic-dangerous-direct-browser-access': 'true',
         };
         body.max_tokens = 280;
-        if (messages[0] && messages[0].role === "system") {
+        if (messages[0] && messages[0].role === 'system') {
           body.system = messages[0].content;
           body.messages = messages.slice(1);
         }
       } else {
-        h.Authorization = "Bearer " + getKey(pid);
-        if (pid === "openai") {
+        h.Authorization = 'Bearer ' + getKey(pid);
+        if (pid === 'openai') {
           body.max_completion_tokens = 280;
           delete body.max_tokens;
         }
         if (REG[pid].hdr) Object.assign(h, REG[pid].hdr());
       }
       // Cheap call: never spend reasoning budget.
-      if (st === "ds") body.thinking = { type: "disabled" };
-      else if (st === "or") body.reasoning = { effort: "low" };
-      else if (st === "openai" || st === "gemini")
-        body.reasoning_effort = "low";
+      if (st === 'ds') body.thinking = { type: 'disabled' };
+      else if (st === 'or') body.reasoning = { effort: 'low' };
+      else if (st === 'openai' || st === 'gemini') body.reasoning_effort = 'low';
       const ac = new AbortController();
       const to = setTimeout(() => ac.abort(), 15000);
       let res, txt;
       try {
         res = await fetch(relayUrl(pid, REG[pid].url), {
-          method: "POST",
+          method: 'POST',
           headers: h,
           body: JSON.stringify(body),
           signal: ac.signal,
@@ -96,23 +93,18 @@ async function metaChat(messages, m, mode = getExtrasMode()) {
 }
 // Pulls the assistant text out of each provider's non-streaming JSON envelope, then parses our JSON tail.
 function parseMetaResponse(txt, style) {
-  let s = String(txt || "");
+  let s = String(txt || '');
   try {
     const j = JSON.parse(s);
-    if (style === "anthropic") {
-      s = (j.content || []).map((b) => (b && b.text ? b.text : "")).join("\n");
-    } else if (style === "gemini" && j.candidates && j.candidates[0]) {
+    if (style === 'anthropic') {
+      s = (j.content || []).map(b => (b && b.text ? b.text : '')).join('\n');
+    } else if (style === 'gemini' && j.candidates && j.candidates[0]) {
       const c = j.candidates[0].content;
-      s = (c && c.parts ? c.parts : [])
-        .map((p) => (p && p.text ? p.text : ""))
-        .join("\n");
+      s = (c && c.parts ? c.parts : []).map(p => (p && p.text ? p.text : '')).join('\n');
     } else if (j.choices && j.choices[0]) {
       const msg = j.choices[0].message || {};
-      s =
-        typeof msg.content === "string"
-          ? msg.content
-          : JSON.stringify(msg.content || "");
-    } else if (typeof j.text === "string") {
+      s = typeof msg.content === 'string' ? msg.content : JSON.stringify(msg.content || '');
+    } else if (typeof j.text === 'string') {
       s = j.text;
     }
   } catch {
@@ -141,17 +133,13 @@ function parseMetaText(txt) {
       }
     }
   }
-  if (!j || typeof j !== "object") return null;
-  let fs = Array.isArray(j.followups)
-    ? j.followups
-    : Array.isArray(j.questions)
-      ? j.questions
-      : [];
+  if (!j || typeof j !== 'object') return null;
+  let fs = Array.isArray(j.followups) ? j.followups : Array.isArray(j.questions) ? j.questions : [];
   fs = fs
-    .map((s) => String(s || "").trim())
-    .filter((s) => s && s.length <= 120)
+    .map(s => String(s || '').trim())
+    .filter(s => s && s.length <= 120)
     .slice(0, 3);
-  const title = typeof j.title === "string" ? j.title.trim() : "";
+  const title = typeof j.title === 'string' ? j.title.trim() : '';
   if (!fs.length && !title) return null;
   return { followups: fs, title: title || null };
 }
@@ -164,29 +152,20 @@ async function generateExtras(c, msgIdx) {
     const m = MODELS[c.model];
     const originalMsg = c.messages[msgIdx];
     const originalContent = originalMsg && originalMsg.content;
-    if (!m || !originalMsg || mode === "off" || (mode === "free" && !m.isFree))
-      return;
+    if (!m || !originalMsg || mode === 'off' || (mode === 'free' && !m.isFree)) return;
     // Build a compact transcript — last 6 turns, text only, trimmed.
     const turns = c.messages
       .slice(0, msgIdx + 1)
-      .filter(
-        (x) =>
-          (x.role === "user" && x.content) ||
-          (x.role === "assistant" && x.content),
-      )
+      .filter(x => (x.role === 'user' && x.content) || (x.role === 'assistant' && x.content))
       .slice(-6)
-      .map((x) => ({
+      .map(x => ({
         role: x.role,
-        content: String(x.content || "").slice(0, 1500),
+        content: String(x.content || '').slice(0, 1500),
       }));
     if (turns.length < 2) return;
     const sys =
       'You are a follow-up assistant. Given the conversation, return ONLY a compact JSON object — no markdown fences, no prose — with exactly this shape:\n{"title":"SHORT TITLE","followups":["Question one?","Question two?","Question three?"]}\n\nRules:\n- title: 3 to 6 words that capture what this conversation is about, no quotes.\n- followups: exactly 3 natural next questions the user could ask, each under 70 characters, based on what was just discussed. Do not repeat what was already asked.\n- Output nothing except the JSON object.';
-    const res = await metaChat(
-      [{ role: "system", content: sys }, ...turns],
-      m,
-      mode,
-    );
+    const res = await metaChat([{ role: 'system', content: sys }, ...turns], m, mode);
     if (!res) return;
     const msg = c.messages[msgIdx];
     // The user may have edited/regenerated this turn while the background call
@@ -212,15 +191,15 @@ async function generateExtras(c, msgIdx) {
 }
 function followupsHtml(msg) {
   const fs = msg.followups || [];
-  if (!fs.length) return "";
-  return `<div class="followups"><span class="followups-label">Follow up</span>${fs.map((q) => `<button type="button" class="chip" data-q="${esc(q)}"><span class="chip-arrow">↗</span>${esc(q)}</button>`).join("")}</div>`;
+  if (!fs.length) return '';
+  return `<div class="followups"><span class="followups-label">Follow up</span>${fs.map(q => `<button type="button" class="chip" data-q="${esc(q)}"><span class="chip-arrow">↗</span>${esc(q)}</button>`).join('')}</div>`;
 }
 function renderFollowups(c, msgIdx) {
   // A background extras call may finish after the user switches chats.
   if (!chatWrap || !chatWrap.querySelector || getActiveChat() !== c) return;
   const el = chatWrap.querySelector(`.msg.assistant[data-idx="${msgIdx}"]`);
   if (!el) return;
-  let box = el.querySelector(".followups");
+  let box = el.querySelector('.followups');
   const fs = (c.messages[msgIdx] || {}).followups || [];
   if (!fs.length) {
     if (box) box.remove();
@@ -229,10 +208,10 @@ function renderFollowups(c, msgIdx) {
   if (box) {
     box.outerHTML = followupsHtml(c.messages[msgIdx]);
   } else {
-    const tpl = document.createElement("template");
+    const tpl = document.createElement('template');
     tpl.innerHTML = followupsHtml(c.messages[msgIdx]);
     const node = tpl.content.firstElementChild;
-    const src = el.querySelector(".msg-sources");
+    const src = el.querySelector('.msg-sources');
     if (src) src.after(node);
     else el.appendChild(node);
   }

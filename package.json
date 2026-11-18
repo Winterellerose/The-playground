@@ -10,13 +10,18 @@
     "test": "node tests/run.cjs",
     "audit:models": "node tests/audit-models.cjs",
     "verify:vendor": "node scripts/verify-vendor.js",
+    "lint": "eslint . --ext .js,.mjs,.cjs",
+    "format": "prettier --write .",
     "relay:nim": "node nim-cors-proxy.js",
     "relay:nim:port": "node nim-cors-proxy.js --port"
   },
   "devDependencies": {
     "dompurify": "3.2.4",
+    "eslint": "^10.15.0",
+    "globals": "^17.14.0",
     "highlight.js": "11.11.1",
     "marked": "15.0.7",
+    "prettier": "^3.10.1",
     "tar": "^7.5.23"
   }
 }

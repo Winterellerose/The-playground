@@ -1,16 +1,14 @@
-"use strict";
+'use strict';
 /* ═══ rotation.js — provider rotation, backoff, getCfg ═══ */
 
 /* ── Rotation engine ── */
-function logRot(msg, type = "evt") {
-  const log = $("rotLog");
+function logRot(msg, type = 'evt') {
+  const log = $('rotLog');
   if (!log) return;
   const now = new Date(),
-    t = [now.getHours(), now.getMinutes(), now.getSeconds()]
-      .map((n) => String(n).padStart(2, "0"))
-      .join(":");
-  const e = document.createElement("div");
-  e.className = "rot-entry";
+    t = [now.getHours(), now.getMinutes(), now.getSeconds()].map(n => String(n).padStart(2, '0')).join(':');
+  const e = document.createElement('div');
+  e.className = 'rot-entry';
   e.innerHTML = `<span class="rot-time">${t}</span><span class="rot-evt ${type}">${esc(msg)}</span>`;
   log.appendChild(e);
   log.scrollTop = log.scrollHeight;
@@ -32,15 +30,12 @@ function markRateLimited(pid) {
   s.errors = (s.errors || 0) + 1;
   const sec = Math.min(30 * Math.pow(2, s.errors - 1), 120);
   s.backoffUntil = Date.now() + sec * 1000;
-  logRot(`${REG[pid].name} rate-limited → backing off ${sec}s`, "warn");
+  logRot(`${REG[pid].name} rate-limited → backing off ${sec}s`, 'warn');
 }
 function markBadKey(pid) {
   rotState[pid] = { ...(rotState[pid] || {}), bad: true };
   refreshKeyUI();
-  logRot(
-    `${REG[pid].name}: key rejected (401/403) — fix it in Settings`,
-    "err",
-  );
+  logRot(`${REG[pid].name}: key rejected (401/403) — fix it in Settings`, 'err');
 }
 function markOk(pid) {
   const s = rotState[pid];
@@ -49,7 +44,7 @@ function markOk(pid) {
     s.backoffUntil = 0;
   }
 }
-const OR_STYLE = ["openrouter", "openrouter_paid"];
+const OR_STYLE = ['openrouter', 'openrouter_paid'];
 const OR_HOSTABLE = /^[a-z0-9~-][a-z0-9._~-]*\/[a-z0-9._~-]+$/i;
 function orHosts(id) {
   // OpenRouter can only proxy an id it actually lists. The vendor/model shape
@@ -57,9 +52,8 @@ function orHosts(id) {
   // NVIDIA-native ids (meta/llama-3.3-70b-instruct) have the right shape and
   // would otherwise cost a guaranteed 404 round trip on every fallback.
   try {
-    const c = JSON.parse(localStorage.getItem(OR_CAT_KEY) || "null");
-    if (c && Array.isArray(c.models) && c.models.length)
-      return c.models.some((mo) => mo.id === id);
+    const c = JSON.parse(localStorage.getItem(OR_CAT_KEY) || 'null');
+    if (c && Array.isArray(c.models) && c.models.length) return c.models.some(mo => mo.id === id);
   } catch {}
   return OR_HOSTABLE.test(id);
 }
@@ -74,11 +68,10 @@ function canServe(pid, m) {
    suffixes, or the live catalog's own pricing. Unknown is treated as paid,
    because promising free and returning 402 is the worse failure. */
 function orIsFree(id) {
-  if (/:free$/i.test(String(id || ""))) return true;
+  if (/:free$/i.test(String(id || ''))) return true;
   try {
-    const c = JSON.parse(localStorage.getItem(OR_CAT_KEY) || "null");
-    const mo =
-      c && Array.isArray(c.models) ? c.models.find((x) => x.id === id) : null;
+    const c = JSON.parse(localStorage.getItem(OR_CAT_KEY) || 'null');
+    const mo = c && Array.isArray(c.models) ? c.models.find(x => x.id === id) : null;
     if (mo) return mo.free === true;
   } catch {}
   return false;
@@ -88,9 +81,8 @@ function orIsFree(id) {
    unknown rather than as "not on OpenRouter". */
 function orCatalogHas(id) {
   try {
-    const c = JSON.parse(localStorage.getItem(OR_CAT_KEY) || "null");
-    if (c && Array.isArray(c.models) && c.models.length)
-      return c.models.some((mo) => mo.id === id);
+    const c = JSON.parse(localStorage.getItem(OR_CAT_KEY) || 'null');
+    if (c && Array.isArray(c.models) && c.models.length) return c.models.some(mo => mo.id === id);
   } catch {}
   return null;
 }
@@ -115,22 +107,21 @@ function substituteOk(pid, m) {
   if (!canServe(pid, m)) return false;
   if (!m.isFree) return true; // paid models may route anywhere they're hosted
   if (OR_STYLE.includes(pid)) return orIsFree(m.apiId);
-  return REG[pid].type === "free";
+  return REG[pid].type === 'free';
 }
 /* Why the model's OWN provider isn't usable — the sentence the user actually
    needs, instead of a request sent somewhere else to fail. */
 function providerBlockNote(m) {
   const p = m.provider,
     r = REG[p] || {};
-  if (!r.name || r.local) return "";
+  if (!r.name || r.local) return '';
   if (relayNeeded(p))
     return `${r.name} sends no CORS headers, so this page can only reach it through a local relay — add one in Settings → ${r.name} → CORS relay`;
   const s = rotState[p];
   if (s && s.bad) return `${r.name} rejected its API key — re-test it in Settings`;
   if (!getKey(p)) return `add your ${r.name} key in Settings`;
-  if (s && s.backoffUntil && Date.now() < s.backoffUntil)
-    return `${r.name} is rate-limited right now`;
-  return "";
+  if (s && s.backoffUntil && Date.now() < s.backoffUntil) return `${r.name} is rate-limited right now`;
+  return '';
 }
 function idFor(pid, m) {
   if (pid === m.provider) return m.apiId;
@@ -141,10 +132,10 @@ function idFor(pid, m) {
    getCfg() (chat) and servingPid() (what the header advertises), so the UI
    can never claim a provider the request won't actually use. */
 function candidatesFor(m, excludedPids = []) {
-  const pool = REG[m.provider].type === "free" ? FREE_PIDS : PAID_PIDS;
+  const pool = REG[m.provider].type === 'free' ? FREE_PIDS : PAID_PIDS;
   const excluded = new Set(excludedPids || []);
   const cands = [];
-  const push = (pid) => {
+  const push = pid => {
     if (
       !excluded.has(pid) &&
       !cands.includes(pid) &&
@@ -157,7 +148,7 @@ function candidatesFor(m, excludedPids = []) {
   push(m.provider);
   if (!REG[m.provider].local) OR_STYLE.forEach(push); // same exact id via OpenRouter
   if (!REG[m.provider].local) pool.forEach(push); // provider-native fallback models
-  if (!REG[m.provider].local) [...PAID_PIDS, ...FREE_PIDS].filter((p) => !REG[p].local).forEach(push); // last resort
+  if (!REG[m.provider].local) [...PAID_PIDS, ...FREE_PIDS].filter(p => !REG[p].local).forEach(push); // last resort
   return cands;
 }
 /* Which provider will actually answer, or null. Logging-free on purpose: it's
@@ -168,29 +159,23 @@ function servingPid(m) {
 }
 function getCfg(excludedPids = []) {
   const m = MODELS[selectedModel];
-  if (!m) return { error: "Select a model." };
+  if (!m) return { error: 'Select a model.' };
   const excluded = new Set(excludedPids || []);
   const cands = candidatesFor(m, excludedPids);
   if (!cands.length) {
     // There ARE providers for this model, but every key is missing/bad/limited
     // — or the only route left would cost credits the user didn't agree to.
-    const haveKey = KEY_DEFS.some(([pid]) => getKey(pid)) || Object.values(REG).some((r) => r.local);
+    const haveKey = KEY_DEFS.some(([pid]) => getKey(pid)) || Object.values(REG).some(r => r.local);
     if (!haveKey)
       return {
-        error:
-          "No API keys configured. Open Settings and add at least one free key (OpenRouter recommended).",
+        error: 'No API keys configured. Open Settings and add at least one free key (OpenRouter recommended).',
       };
     const own = providerBlockNote(m);
     // A metered provider that COULD have served the exact id, which we refused
     // on purpose because the model is free. Name it rather than letting the
     // request fail with a bare 402.
     const paidRoute = OR_STYLE.find(
-      (p) =>
-        !excluded.has(p) &&
-        REG[p].type !== "free" &&
-        getKey(p) &&
-        avail(p) &&
-        canServe(p, m),
+      p => !excluded.has(p) && REG[p].type !== 'free' && getKey(p) && avail(p) && canServe(p, m)
     );
     // Only claim this when the catalog actually says so: orHosts() falls back
     // to an id-shape guess, and "OpenRouter would charge you" is not something
@@ -200,22 +185,22 @@ function getCfg(excludedPids = []) {
       m.isFree &&
       orCatalogHas(m.apiId) === true &&
       !orIsFree(m.apiId) &&
-      OR_STYLE.find((p) => !excluded.has(p) && getKey(p) && avail(p));
+      OR_STYLE.find(p => !excluded.has(p) && getKey(p) && avail(p));
     if (m.isFree && (paidRoute || orPaidId))
       return {
         error: `"${m.name}" is a FREE ${REG[m.provider].name} model, so it was NOT re-routed to OpenRouter — that route bills credits and answers 402 when the account has none. ${
-          own ? "Fix: " + own + "." : ""
+          own ? 'Fix: ' + own + '.' : ''
         } Or pick a model marked PREMIUM if you mean to spend credits.`,
       };
     if (own)
       return {
         error: `"${m.name}" is served by ${REG[m.provider].name} — ${own}.`,
       };
-    const canHost = Object.keys(REG).filter((p) => canServe(p, m));
-    const missing = canHost.filter((p) => !REG[p].local && !getKey(p));
+    const canHost = Object.keys(REG).filter(p => canServe(p, m));
+    const missing = canHost.filter(p => !REG[p].local && !getKey(p));
     if (missing.length)
       return {
-        error: `"${m.name}" needs ${missing.map((p) => REG[p].name).join(" or ")} — add that key in Settings, or pick a model you have a key for.`,
+        error: `"${m.name}" needs ${missing.map(p => REG[p].name).join(' or ')} — add that key in Settings, or pick a model you have a key for.`,
       };
     return {
       error: `All providers for "${m.name}" are rate-limited or rejected the request. Free tiers can be busy — wait a moment, pick another free model, or add a paid key.`,
@@ -226,18 +211,18 @@ function getCfg(excludedPids = []) {
   if (pid !== m.provider)
     logRot(
       `${m.badge || m.apiId}: ${REG[m.provider].name} not used — routing via ${prov.name} → ${idFor(pid, m)}`,
-      prov.type === "free" ? "ok" : "warn",
+      prov.type === 'free' ? 'ok' : 'warn'
     );
   return {
     model: m,
     pid,
     modelId: idFor(pid, m),
-    apiKey: REG[pid].local ? "" : getKey(pid),
-    thinking: $("thinkingToggle").classList.contains("on"),
-    effort: $("effortSelect").value,
-    temp: parseFloat($("tempSelect").value),
-    maxTok: Math.max(256, parseInt($("maxTok").value) || 8192),
-    sys: $("sysPrompt").value.trim(),
+    apiKey: REG[pid].local ? '' : getKey(pid),
+    thinking: $('thinkingToggle').classList.contains('on'),
+    effort: $('effortSelect').value,
+    temp: parseFloat($('tempSelect').value),
+    maxTok: Math.max(256, parseInt($('maxTok').value) || 8192),
+    sys: $('sysPrompt').value.trim(),
     chatSys: chatSysText(),
     webSearch: webSearchMode,
   };

@@ -1,21 +1,60 @@
-"use strict";
+'use strict';
 /* ═══ streaming.js — input handling, streaming core, send/run ═══ */
 
 /* ── Input ── */
-let voiceRec=null, voiceOn=false, historyPos=-1;
-function toggleVoice() { const R=window.SpeechRecognition||window.webkitSpeechRecognition; if(!R) return; if(voiceOn) return voiceRec.stop(); voiceRec=new R(); voiceRec.lang=navigator.language; voiceRec.interimResults=true; let base=userInput.value; voiceRec.onresult=(e)=>{ let t=""; for(let i=e.resultIndex;i<e.results.length;i++) t+=e.results[i][0].transcript; userInput.value=(base && !/\s$/.test(base)?base+" ":base)+t; autoResizeInput(); }; voiceRec.onend=()=>{voiceOn=false; $("micBtn").classList.remove("on")}; voiceRec.onerror=()=>{logRot("Voice input failed", "warn"); voiceOn=false; $("micBtn").classList.remove("on")}; voiceOn=true; $("micBtn").classList.add("on"); voiceRec.start(); }
+let voiceRec = null,
+  voiceOn = false,
+  historyPos = -1;
+function toggleVoice() {
+  const R = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!R) return;
+  if (voiceOn) return voiceRec.stop();
+  voiceRec = new R();
+  voiceRec.lang = navigator.language;
+  voiceRec.interimResults = true;
+  let base = userInput.value;
+  voiceRec.onresult = e => {
+    let t = '';
+    for (let i = e.resultIndex; i < e.results.length; i++) t += e.results[i][0].transcript;
+    userInput.value = (base && !/\s$/.test(base) ? base + ' ' : base) + t;
+    autoResizeInput();
+  };
+  voiceRec.onend = () => {
+    voiceOn = false;
+    $('micBtn').classList.remove('on');
+  };
+  voiceRec.onerror = () => {
+    logRot('Voice input failed', 'warn');
+    voiceOn = false;
+    $('micBtn').classList.remove('on');
+  };
+  voiceOn = true;
+  $('micBtn').classList.add('on');
+  voiceRec.start();
+}
 function handleKey(e) {
-  if ((e.key === "ArrowUp" || e.key === "ArrowDown") && (!userInput.value || userInput.selectionStart === 0)) { const a=(getActiveChat()?.messages||[]).filter(x=>x.role === "user"); if(a.length) { e.preventDefault(); historyPos=e.key === "ArrowUp" ? Math.max(0,historyPos < 0 ? a.length-1 : historyPos-1) : Math.min(a.length,historyPos+1); userInput.value=historyPos<a.length?(a[historyPos].content||""):""; autoResizeInput(); } return; }
-  if (e.key === "Tab") {
+  if ((e.key === 'ArrowUp' || e.key === 'ArrowDown') && (!userInput.value || userInput.selectionStart === 0)) {
+    const a = (getActiveChat()?.messages || []).filter(x => x.role === 'user');
+    if (a.length) {
+      e.preventDefault();
+      historyPos =
+        e.key === 'ArrowUp'
+          ? Math.max(0, historyPos < 0 ? a.length - 1 : historyPos - 1)
+          : Math.min(a.length, historyPos + 1);
+      userInput.value = historyPos < a.length ? a[historyPos].content || '' : '';
+      autoResizeInput();
+    }
+    return;
+  }
+  if (e.key === 'Tab') {
     e.preventDefault();
     const s = userInput.selectionStart,
       en = userInput.selectionEnd;
-    userInput.value =
-      userInput.value.slice(0, s) + "  " + userInput.value.slice(en);
+    userInput.value = userInput.value.slice(0, s) + '  ' + userInput.value.slice(en);
     userInput.selectionStart = userInput.selectionEnd = s + 2;
     return;
   }
-  if (e.key === "Enter" && !e.shiftKey) {
+  if (e.key === 'Enter' && !e.shiftKey) {
     e.preventDefault();
     if (!isStreaming) sendMessage();
   }
@@ -26,11 +65,11 @@ function setStreamingUI(on) {
   if (on) {
     sendBtn.innerHTML =
       'Stop <svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>';
-    sendBtn.classList.add("stopping");
+    sendBtn.classList.add('stopping');
   } else {
     sendBtn.innerHTML =
       'Send <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="7" y1="17" x2="17" y2="7"/><polyline points="7 7 17 7 17 17"/></svg>';
-    sendBtn.classList.remove("stopping");
+    sendBtn.classList.remove('stopping');
   }
 }
 function stopStream(userInitiated) {
@@ -51,14 +90,13 @@ function stopStream(userInitiated) {
 
 /* ── Streaming core ── */
 async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
-  if (gen !== streamGen)
-    return { content: "", thinking: "", meta: null, aborted: true };
+  if (gen !== streamGen) return { content: '', thinking: '', meta: null, aborted: true };
   const cfg = getCfg(tried);
-  const body = msgDiv.querySelector(".msg-body");
+  const body = msgDiv.querySelector('.msg-body');
   if (cfg.error) {
     body.innerHTML = '<p style="color:var(--text-faint)">—</p>';
     showError(cfg.error);
-    return { content: "", thinking: "", meta: null, error: cfg.error };
+    return { content: '', thinking: '', meta: null, error: cfg.error };
   }
   const targetIdx = parseInt(msgDiv.dataset.idx);
   // Set up the abort controller BEFORE any async work so Stop works during
@@ -66,13 +104,13 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
   abortCtrl = new AbortController();
   const signal = abortCtrl.signal;
   const lastUser =
-    (c.messages
-      .slice(0, targetIdx)
-      .filter((x) => x.role === "user")
-      .pop() || {}).content || "";
-  const doSearch =
-    cfg.webSearch === "on" ||
-    (cfg.webSearch === "auto" && webNeedsSearch(lastUser));
+    (
+      c.messages
+        .slice(0, targetIdx)
+        .filter(x => x.role === 'user')
+        .pop() || {}
+    ).content || '';
+  const doSearch = cfg.webSearch === 'on' || (cfg.webSearch === 'auto' && webNeedsSearch(lastUser));
   if (doSearch) {
     if (searchCache.gen === gen && searchCache.q === lastUser) {
       cfg.webSources = searchCache.srcs;
@@ -81,25 +119,20 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
       const q = lastUser;
       try {
         const srcs = await freeWebSearch(q, signal);
-        if (gen !== streamGen)
-          return { content: "", thinking: "", meta: null, aborted: true };
+        if (gen !== streamGen) return { content: '', thinking: '', meta: null, aborted: true };
         if (srcs && srcs.length) {
           cfg.webContext = formatWebContext(srcs);
           cfg.webSources = srcs;
-          logRot(`🌐 Web search: ${srcs.length} sources injected`, "ok");
-        } else
-          logRot(
-            "🌐 Web search: no results (add a search key in Settings)",
-            "warn",
-          );
+          logRot(`🌐 Web search: ${srcs.length} sources injected`, 'ok');
+        } else logRot('🌐 Web search: no results (add a search key in Settings)', 'warn');
       } catch {
-        logRot("🌐 Web search failed — sending without context", "warn");
+        logRot('🌐 Web search failed — sending without context', 'warn');
       }
       searchCache = {
         gen,
         q,
         srcs: cfg.webSources || [],
-        ctx: cfg.webContext || "",
+        ctx: cfg.webContext || '',
       };
     }
   }
@@ -108,17 +141,12 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
   // but were invisible to it — a "small" chat with a pasted file could
   // silently blow past the model's limit. Count them here; image refs are
   // resolved on a copy so the live messages keep their storage-friendly form.
-  const sysChars =
-    (($("sysPrompt") && $("sysPrompt").value.trim().length) || 0) +
-    chatSysText().length +
-    160; // composeSys date stamp + section labels
-  const hist = await hydrateHistImages(
-    cleanHistory(c, targetIdx, sysChars + (cfg.webContext || "").length),
-  );
+  const sysChars = (($('sysPrompt') && $('sysPrompt').value.trim().length) || 0) + chatSysText().length + 160; // composeSys date stamp + section labels
+  const hist = await hydrateHistImages(cleanHistory(c, targetIdx, sysChars + (cfg.webContext || '').length));
   const { h, rb } = buildRequest(cfg, hist);
   const { pid, model: m } = cfg;
-  let full = "",
-    think = "",
+  let full = '',
+    think = '',
     meta = null,
     finish = null,
     t0 = performance.now();
@@ -128,12 +156,9 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
     lastRender = 0;
 
   try {
-    logRot(
-      `→ ${REG[pid].name} · ${cfg.modelId}${cfg.webSources && cfg.webSources.length ? " · 🌐 web" : ""}`,
-      "ok",
-    );
+    logRot(`→ ${REG[pid].name} · ${cfg.modelId}${cfg.webSources && cfg.webSources.length ? ' · 🌐 web' : ''}`, 'ok');
     const res = await fetch(relayUrl(pid, REG[pid].url), {
-      method: "POST",
+      method: 'POST',
       headers: h,
       body: JSON.stringify(rb),
       signal: abortCtrl.signal,
@@ -150,9 +175,7 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
       const retriable =
         res.status === 429 ||
         res.status >= 500 ||
-        /rate|quota|overloaded|timeout|capacity|upstream|temporarily|unavailable|no available/i.test(
-          em,
-        );
+        /rate|quota|overloaded|timeout|capacity|upstream|temporarily|unavailable|no available/i.test(em);
       const badKey = res.status === 401 || res.status === 403;
       if (badKey) markBadKey(pid);
       if (retriable) markRateLimited(pid);
@@ -169,7 +192,7 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
             retriable
               ? `${REG[pid].name} busy/error → trying ${via}`
               : `${REG[pid].name} rejected request → trying ${via}`,
-            "warn",
+            'warn'
           );
           return doStream(c, msgDiv, attempted, gen, regenIdx);
         }
@@ -177,32 +200,24 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
         // generic "all providers rate limited".
         if (res.status === 429 || /rate|quota/i.test(em))
           em = `${m.name}: rate limited on ${REG[pid].name}. Free tiers are shared and can be busy — try again in a moment, pick a different free model, or add an OpenRouter (paid) key.`;
-        else if (
-          res.status >= 500 ||
-          /overloaded|capacity|upstream|unavailable|temporarily|timeout/i.test(
-            em,
-          )
-        )
+        else if (res.status >= 500 || /overloaded|capacity|upstream|unavailable|temporarily|timeout/i.test(em))
           em = `${m.name}: ${REG[pid].name} is overloaded or down right now. Free endpoints have limited uptime — try again shortly or choose another model.`;
-        else if (badKey)
-          em = `${REG[pid].name} rejected your API key (${res.status}). Check it in Settings.`;
+        else if (badKey) em = `${REG[pid].name} rejected your API key (${res.status}). Check it in Settings.`;
       }
       throw new Error(
         em +
-          (res.status === 400
-            ? " — check model ID / context length. You can add the exact ID as a custom model."
-            : ""),
+          (res.status === 400 ? ' — check model ID / context length. You can add the exact ID as a custom model.' : '')
       );
     }
     markOk(pid);
     const reader = res.body.getReader(),
       dec = new TextDecoder();
-    let buf = "";
-    const handleLine = (line) => {
+    let buf = '';
+    const handleLine = line => {
       const tr = line.trim();
-      if (!tr.startsWith("data:")) return;
+      if (!tr.startsWith('data:')) return;
       const data = tr.slice(5).trim();
-      if (data === "[DONE]") return;
+      if (data === '[DONE]') return;
       let evt;
       try {
         evt = JSON.parse(data);
@@ -211,56 +226,49 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
       }
       if (evt.usage) {
         meta = meta || {};
-        meta.out =
-          evt.usage.completion_tokens ?? evt.usage.output_tokens ?? meta.out;
-        meta.in =
-          evt.usage.prompt_tokens ?? evt.usage.input_tokens ?? meta.in;
+        meta.out = evt.usage.completion_tokens ?? evt.usage.output_tokens ?? meta.out;
+        meta.in = evt.usage.prompt_tokens ?? evt.usage.input_tokens ?? meta.in;
       }
-      if (evt.type === "message_delta" && evt.usage) {
+      if (evt.type === 'message_delta' && evt.usage) {
         meta = meta || {};
         meta.out = evt.usage.output_tokens ?? meta.out;
       }
-      if (evt.type === "message_delta" && evt.delta && evt.delta.stop_reason)
-        finish = evt.delta.stop_reason; // "end_turn" | "max_tokens" | …
+      if (evt.type === 'message_delta' && evt.delta && evt.delta.stop_reason) finish = evt.delta.stop_reason; // "end_turn" | "max_tokens" | …
       let rc = null,
         txt = null;
-      if (evt.type === "content_block_delta" && evt.delta) {
-        if (evt.delta.type === "thinking_delta") rc = evt.delta.thinking;
-        else if (evt.delta.type === "text_delta") txt = evt.delta.text;
+      if (evt.type === 'content_block_delta' && evt.delta) {
+        if (evt.delta.type === 'thinking_delta') rc = evt.delta.thinking;
+        else if (evt.delta.type === 'text_delta') txt = evt.delta.text;
       } else {
-        if (evt.choices && evt.choices[0] && evt.choices[0].finish_reason)
-          finish = evt.choices[0].finish_reason; // "stop" | "length" | …
+        if (evt.choices && evt.choices[0] && evt.choices[0].finish_reason) finish = evt.choices[0].finish_reason; // "stop" | "length" | …
         const d = evt.choices && evt.choices[0] && evt.choices[0].delta;
         if (!d) return;
         rc =
-          typeof d.reasoning_content === "string"
+          typeof d.reasoning_content === 'string'
             ? d.reasoning_content
-            : typeof d.reasoning === "string"
+            : typeof d.reasoning === 'string'
               ? d.reasoning
               : null;
         txt = d.content || null;
       }
       if (rc) {
         if (!pulse) {
-          pulse = document.createElement("div");
-          pulse.className = "thinking-pulse";
-          pulse.innerHTML =
-            '<span>Thinking</span><span class="dots"><span></span><span></span><span></span></span>';
+          pulse = document.createElement('div');
+          pulse.className = 'thinking-pulse';
+          pulse.innerHTML = '<span>Thinking</span><span class="dots"><span></span><span></span><span></span></span>';
           body.insertBefore(pulse, body.firstChild);
         }
         think += rc;
         if (think.length > 10 && !block) {
           pulse.remove();
           pulse = null;
-          body.insertAdjacentHTML("afterbegin", thinkingHtml(think));
-          block = body.querySelector(".thinking-block");
+          body.insertAdjacentHTML('afterbegin', thinkingHtml(think));
+          block = body.querySelector('.thinking-block');
         }
         if (block) {
-          const tc = block.querySelector(".thinking-content");
+          const tc = block.querySelector('.thinking-content');
           tc.textContent = think;
-          block.querySelector(".preview").textContent = think
-            .slice(0, 120)
-            .replace(/\n/g, " ");
+          block.querySelector('.preview').textContent = think.slice(0, 120).replace(/\n/g, ' ');
           tc.scrollTop = tc.scrollHeight;
         }
       }
@@ -275,11 +283,9 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
         // A full parse+sanitize pass per chunk janks on fast streams; re-render
         // at most every 120ms. The completion path always renders the final text.
         if (now - lastRender >= 120) {
-          const tHead = body.querySelector(".thinking-block")
-            ? body.querySelector(".thinking-block").outerHTML
-            : "";
+          const tHead = body.querySelector('.thinking-block') ? body.querySelector('.thinking-block').outerHTML : '';
           body.innerHTML = tHead + renderMd(full, true);
-          body.classList.add("streaming-cursor");
+          body.classList.add('streaming-cursor');
           lastRender = now;
           if (now - lastHl > 800) {
             highlight(body);
@@ -296,17 +302,17 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
         try {
           reader.cancel();
         } catch {}
-        return { content: "", thinking: "", meta: null, aborted: true };
+        return { content: '', thinking: '', meta: null, aborted: true };
       }
       buf += dec.decode(value, { stream: true });
-      const lines = buf.split("\n");
-      buf = lines.pop() || "";
+      const lines = buf.split('\n');
+      buf = lines.pop() || '';
       for (const line of lines) handleLine(line);
     }
     // Final flush: the last SSE line can arrive without a trailing newline and
     // TextDecoder can still hold a split multi-byte character — drop neither.
     buf += dec.decode();
-    if (buf) buf.split("\n").forEach(handleLine);
+    if (buf) buf.split('\n').forEach(handleLine);
   } catch (e) {
     if (gen !== streamGen) {
       // A user Stop aborts the in-flight fetch. Keep what streamed so far
@@ -319,16 +325,13 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
           meta: null,
           stopped: true,
         };
-      return { content: "", thinking: "", meta: null, aborted: true };
+      return { content: '', thinking: '', meta: null, aborted: true };
     }
-    if (e.name !== "AbortError") {
+    if (e.name !== 'AbortError') {
       let em = e.message;
       // With a relay configured, a dead fetch means the relay is down — the
       // provider call itself never happens from here.
-      if (
-        relayBase(pid) &&
-        /failed to fetch|load failed|networkerror/i.test(String(em || ""))
-      )
+      if (relayBase(pid) && /failed to fetch|load failed|networkerror/i.test(String(em || '')))
         em = `${REG[pid].name}: the CORS relay at ${relayBase(pid)} didn't answer — is it running?`;
       showError(em, () => {
         if (gen === streamGen) {
@@ -336,7 +339,7 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
           runCompletion(c, regenIdx);
         }
       });
-      logRot(`Error: ${em}`, "err");
+      logRot(`Error: ${em}`, 'err');
     }
   }
   if (gen !== streamGen) {
@@ -347,16 +350,15 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
         meta: null,
         stopped: true,
       };
-    return { content: "", thinking: "", meta: null, aborted: true };
+    return { content: '', thinking: '', meta: null, aborted: true };
   }
-  body.classList.remove("streaming-cursor");
+  body.classList.remove('streaming-cursor');
   const ms = performance.now() - t0;
-  const truncated =
-    (finish === "length" || finish === "max_tokens") && !!(full || think);
-  if (finish === "length" || finish === "max_tokens")
+  const truncated = (finish === 'length' || finish === 'max_tokens') && !!(full || think);
+  if (finish === 'length' || finish === 'max_tokens')
     logRot(
       `⚠️ ${REG[pid].name} hit the max output tokens limit — answer cut off. Raise "Max output tokens" in Settings`,
-      "warn",
+      'warn'
     );
   if (full || think) {
     meta = meta || {};
@@ -366,18 +368,16 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
     meta.ms = Math.round(ms);
     const outTok = meta.out || Math.round(full.length / 4);
     meta.tps = Math.round(outTok / (ms / 1000));
-    const tHead = body.querySelector(".thinking-block")
-      ? body.querySelector(".thinking-block").outerHTML
-      : "";
+    const tHead = body.querySelector('.thinking-block') ? body.querySelector('.thinking-block').outerHTML : '';
     body.innerHTML = tHead + renderMd(full);
     if (truncated) {
-      const note = document.createElement("div");
-      note.className = "truncated-note";
+      const note = document.createElement('div');
+      note.className = 'truncated-note';
       note.textContent =
-        "⚠️ " +
+        '⚠️ ' +
         (cfg.thinking && m.thinking === true && !m.adaptive
-          ? "Response cut off — the thinking budget and the answer share the same max output tokens limit. Raise it in Settings."
-          : "Response cut off — the model hit the max output tokens limit. Raise it in Settings.");
+          ? 'Response cut off — the thinking budget and the answer share the same max output tokens limit. Raise it in Settings.'
+          : 'Response cut off — the model hit the max output tokens limit. Raise it in Settings.');
       body.appendChild(note);
     }
     body.dataset.raw = full;
@@ -398,13 +398,13 @@ async function runCompletion(c, regenIdx) {
     showError(cfgCheck.error);
     return;
   }
-  chatWrap.querySelectorAll(".error-msg").forEach((e) => e.remove());
+  chatWrap.querySelectorAll('.error-msg').forEach(e => e.remove());
   const gen = ++streamGen;
   stopGen = -1;
   setStreamingUI(true);
   const idx = regenIdx !== undefined ? regenIdx : c.messages.length;
-  const d = document.createElement("div");
-  d.className = "msg assistant";
+  const d = document.createElement('div');
+  d.className = 'msg assistant';
   d.dataset.idx = idx;
   d.innerHTML = `<div class="msg-header"><span class="msg-role assistant">AI</span><div class="msg-actions"><span class="copied-toast">Copied</span><button data-act="copy-msg" title="Copy" aria-label="Copy message">${COPY_SVG}</button></div></div><div class="msg-body streaming-cursor"></div>`;
   chatWrap.appendChild(d);
@@ -459,7 +459,7 @@ async function runCompletion(c, regenIdx) {
       asstIdx = idx;
     } else {
       c.messages.push({
-        role: "assistant",
+        role: 'assistant',
         content: result.content,
         thinking: result.thinking,
         meta: result.meta,
@@ -475,7 +475,7 @@ async function runCompletion(c, regenIdx) {
     renderSidebar();
     if (!persisted)
       showError(
-        "This answer is visible now but could not be saved because browser storage is full. Export or delete old chats before reloading.",
+        'This answer is visible now but could not be saved because browser storage is full. Export or delete old chats before reloading.'
       );
     // One cheap non-streaming call → 5-word title + 3 clickable follow-up chips.
     // Skip it when the user manually stopped (partial answer); not worth a call.
@@ -489,7 +489,7 @@ async function sendMessage() {
   if (voiceOn && voiceRec) voiceRec.stop();
   const text = userInput.value.trim();
   const imgs = pendingImages.slice();
-  const files = pendingFiles.map((f) => ({
+  const files = pendingFiles.map(f => ({
     name: f.name,
     type: f.type,
     size: f.size,
@@ -498,8 +498,7 @@ async function sendMessage() {
   if ((!text && !imgs.length && !files.length) || isStreaming) return;
   if (imgs.length && !visionCapable()) {
     showError(
-      (curModel() ? curModel().name : "This model") +
-        " doesn't accept images — pick a model with the VISION tag.",
+      (curModel() ? curModel().name : 'This model') + " doesn't accept images — pick a model with the VISION tag."
     );
     return;
   }
@@ -511,14 +510,11 @@ async function sendMessage() {
   const c = ensureChat();
   const previous = { model: c.model, title: c.title, updatedAt: c.updatedAt };
   c.model = selectedModel;
-  const storedText = text || (imgs.length && !files.length ? "(image)" : "");
+  const storedText = text || (imgs.length && !files.length ? '(image)' : '');
   if (c.messages.length === 0)
-    c.title =
-      text.slice(0, 60) ||
-      (files[0] && files[0].name) ||
-      (imgs.length ? "(image)" : "New chat");
+    c.title = text.slice(0, 60) || (files[0] && files[0].name) || (imgs.length ? '(image)' : 'New chat');
   c.messages.push({
-    role: "user",
+    role: 'user',
     content: storedText,
     images: imgs.length ? imgs : undefined,
     files: files.length ? files : undefined,
@@ -528,22 +524,16 @@ async function sendMessage() {
     c.messages.pop();
     Object.assign(c, previous);
     showError(
-      "Browser storage is full. Your message and attachments are still staged — export or delete old chats, then try again.",
+      'Browser storage is full. Your message and attachments are still staged — export or delete old chats, then try again.'
     );
     return;
   }
   renderSidebar();
-  welcome.style.display = "none";
+  welcome.style.display = 'none';
   resetScrollPin(); // your own message → re-engage auto-scroll
-  addUserMsg(
-    storedText,
-    c.messages.length - 1,
-    true,
-    imgs.length ? imgs : undefined,
-    files.length ? files : undefined,
-  );
-  userInput.value = "";
-  userInput.style.height = "auto";
+  addUserMsg(storedText, c.messages.length - 1, true, imgs.length ? imgs : undefined, files.length ? files : undefined);
+  userInput.value = '';
+  userInput.style.height = 'auto';
   pendingImages = [];
   pendingFiles = [];
   renderPreviews();

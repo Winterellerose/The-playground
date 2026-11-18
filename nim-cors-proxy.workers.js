@@ -13,10 +13,12 @@ function corsHeaders(origin) {
     'Access-Control-Max-Age': '86400',
   };
   // Allow any localhost, 127.0.0.1, or file:// (null) origin
-  if (origin === 'null' ||
-      origin?.startsWith('http://localhost:') ||
-      origin?.startsWith('http://127.0.0.1:') ||
-      origin?.startsWith('https://') && origin.includes('.workers.dev')) {
+  if (
+    origin === 'null' ||
+    origin?.startsWith('http://localhost:') ||
+    origin?.startsWith('http://127.0.0.1:') ||
+    (origin?.startsWith('https://') && origin.includes('.workers.dev'))
+  ) {
     h['Access-Control-Allow-Origin'] = origin;
   }
   return h;
@@ -58,7 +60,7 @@ export default {
       Object.entries(cors).forEach(([k, v]) => responseHeaders.set(k, v));
       responseHeaders.delete('Connection');
       responseHeaders.delete('Transfer-Encoding');
-      responseHeaders.delete('Content-Encoding');  // let CF handle compression
+      responseHeaders.delete('Content-Encoding'); // let CF handle compression
 
       return new Response(response.body, {
         status: response.status,

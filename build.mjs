@@ -51,55 +51,41 @@ try { new Function(appJs) } catch (e) { fail('bundled JS does not parse: ' + e.m
 let html = read('index.html');
 const swap = (tag, inline) => {
     if (!html.includes(tag)) fail('tag not found in index.html: ' + tag.slice(0, 60));
-    html = html.replace(tag, () => inline); // function replacer: $-patterns in code stay literal
+    html = html.replace(tag, () => inline);
 };
 swap('<link rel="stylesheet" href="css/app.css">', '<style>\n' + css + '\n</style>');
 swap('<link rel="stylesheet" href="js/vendor/github-dark-dimmed.min.css">', '<style>\n' + hljsCss + '\n</style>');
 swap('<script src="js/vendor/highlight.min.js"></script>', '<script>\n' + hljsJs + '\n</script>');
 swap('<script src="js/vendor/marked.umd.js"></script>', '<script>\n' + markedSrc + '\n</script>');
 swap('<script src="js/vendor/purify.min.js"></script>', '<script>\n' + purifySrc + '\n</script>');
-/* Match the script block regardless of line ending style (\n or \r\n). */
+
+/* Match the script block regardless of line ending style (\n or \r\n) and leading whitespace. */
 const scriptBlockRegex = new RegExp(
-  ORDER.map(f => '<script src="js/' + f + '\\.js"></script>').join('\\r?\\n')
+  ORDER.map(f => '\\s*<script src="js/' + f + '\\.js"></script>').join('\\r?\\n')
 );
 const scriptBlockMatch = html.match(scriptBlockRegex);
 if (!scriptBlockMatch) fail('script block not found in index.html (check line endings / order)');
 html = html.replace(scriptBlockMatch[0],
   '<!-- built from ' + ORDER.length + ' files — edit the sources, not this file -->\n<script>\n' + appJs + '\n</script>');
 
-/* Post-inline checks ignore HTML comments: the CSP notes in index.html
-   mention "<script src=…>" and "'self' on script-src" in prose, which
-   would otherwise trip these guards even though no real tag survived. */
+/* Post-inline checks ignore HTML comments. */
 const stripComments = s => s.replace(/<!--[\s\S]*?-->/g, '');
 if (/<script\s+src=/i.test(stripComments(html))) fail('a <script src> tag survived inlining');
 if (/<link(?![^>]+fonts\.googleapis)[^>]+stylesheet/i.test(stripComments(html))) fail('the stylesheet <link> survived inlining');
 
-/* The dev CSP allows 'self' for the modular <script src>/<link> tags. The
-   artifact is fully inlined, so tighten it back — and fail loudly if the
-   dev policy ever survives into the shipped file. */
-html = html.replace(
-  "script-src 'unsafe-inline' 'self'",
-  "script-src 'unsafe-inline'",
-);
-html = html.replace(
-  "style-src 'unsafe-inline' 'self' https://fonts.googleapis.com",
-  "style-src 'unsafe-inline' https://fonts.googleapis.com",
-);
-if (/(script|style)-src[^;]*'self'/.test(stripComments(html)))
-  fail("dev CSP ('self') survived into the built artifact");
+/* Tighten CSP for production artifact. */
+html = html.replace("script-src 'unsafe-inline' 'self'", "script-src 'unsafe-inline'");
+html = html.replace("style-src 'unsafe-inline' 'self' https://fonts.googleapis.com", "style-src 'unsafe-inline' https://fonts.googleapis.com");
+if (/(script|style)-src[^;]*'self'/.test(stripComments(html))) fail("dev CSP ('self') survived into the built artifact");
 
-/* Inject build info into the HTML (as a comment, visible in DevTools) */
+/* Inject build info. */
 html = html.replace('</head>', buildInfo + '\n</head>');
 
 mkdirSync(join(ROOT, 'docs'), { recursive: true });
 writeFileSync(join(ROOT, 'docs', 'index.html'), html);
-
-/* Write version.txt for deploy verification */
 writeFileSync(join(ROOT, 'docs', 'version.txt'), `version: ${version}\ncommit: ${commit}\nbuilt: ${new Date().toISOString()}\n`);
 
-/* Copy PWA assets (manifest, service worker, icons) into docs/ so the
-   Pages deploy serves them alongside the single-file artifact. The app
-   itself stays fully self-contained — these only power install/offline. */
+/* Copy PWA assets. */
 const PWA_ASSETS = ['manifest.webmanifest', 'sw.js'];
 const PWA_DIRS = ['icons'];
 for (const rel of PWA_ASSETS) {
