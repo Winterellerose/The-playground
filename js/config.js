@@ -297,15 +297,6 @@ const REG = {
     style: 'openai',
     rpm: 'tier-based',
   },
-  atria: {
-    name: 'Atria Dawn',
-    type: 'free',
-    url: 'https://api.atria-asi.ai/v1/chat/completions',
-    models: 'https://api.atria-asi.ai/v1/models',
-    style: 'openai',
-    usage: true,
-    rpm: 'preview quota',
-  },
 };
 const FREE_PIDS = Object.keys(REG).filter(k => REG[k].type === 'free');
 const PAID_PIDS = Object.keys(REG).filter(k => REG[k].type === 'paid');
@@ -323,7 +314,6 @@ const KEY_INPUTS = {
   anthropic: 'keyAnthropic',
   openai: 'keyOpenAI',
   sambanova: 'keySambaNova',
-  atria: 'keyAtria',
 };
 // Only used when the exact model truly can't be served anywhere else.
 // These must be real, currently-available model IDs per provider.
@@ -344,7 +334,6 @@ const FALLBACK_ID = {
   openai: 'gpt-5.5',
   anthropic: 'claude-sonnet-5',
   sambanova: 'Meta-Llama-3.3-70B-Instruct',
-  atria: 'Atria-Dawn-Preview',
 };
 
 const GROUPS = [
@@ -400,21 +389,9 @@ function regroupModels() {
 }
 
 const MODELS = {
-  'atria-dawn': {
-    name: 'Atria Dawn Preview',
-    badge: 'ATRIA',
-    group: 'featured',
-    provider: 'atria',
-    apiId: 'Atria-Dawn-Preview',
-    isFree: true,
-    intel: 5,
-    ctx: '—',
-    vision: false,
-    desc: 'Atria Dawn Preview via api.atria-asi.ai.',
-  },
   /* ── Featured ── */
-  // Audited 2026-08-28 against the live catalog: owl-alpha AND ox-alpha (anonymous stealth previews)
-  // are both gone — nem-35l (brand-new, free, 1M ctx) takes the freed featured slot.
+  // IDs and routes checked against OpenRouter model endpoints on 2026-11-19.
+  // Free means zero token price on the listed route, not keyless access.
   'glm-53f': {
     name: 'GLM 5.3 Flash',
     badge: 'GLM 5.3F',
@@ -964,7 +941,6 @@ const MAX_OUT_BY_PROVIDER = {
   sambanova: 8192,
   zai: 8192,
   _paid: 8192,
-  atria: 8192,
 };
 const MAX_OUT_BY_APIID = {
   'meta/llama-3.3-70b-instruct': 4096, // NVIDIA free tier caps low

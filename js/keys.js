@@ -16,7 +16,6 @@ const KEY_DEFS = [
   ['anthropic', 'Anthropic', 'sk-ant-…'],
   ['openai', 'OpenAI', 'sk-…'],
   ['sambanova', 'SambaNova', '…'],
-  ['atria', 'Atria Dawn', 'atria-…'],
 ];
 function buildKeyInputs() {
   const local = Object.keys(REG).filter(p => REG[p].local);

@@ -1,4 +1,4 @@
-const C = 'playground-v7',
+const C = 'playground-v8',
   S = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png'];
 
 self.addEventListener('install', e =>

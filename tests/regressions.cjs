@@ -183,3 +183,29 @@ test('Worker forwards only trusted routes and preserves /v1', async t => {
   assert.equal(response.headers.get('Access-Control-Allow-Origin'), 'https://app.example');
   assert.equal(await response.text(), 'data: [DONE]\n\n');
 });
+
+
+test('featured picks have checked routes and removed provider is not offered anywhere', () => {
+  // Checked against /api/v1/models/{author}/{model}/endpoints on 2026-11-19.
+  const ctx = context();
+  vm.runInContext(source('js/config.js') + '\nregroupModels(); this.featured = Object.values(MODELS).filter(m => m.group === "featured"); this.registry = REG; this.keys = KEY_INPUTS; this.fallbacks = FALLBACK_ID;', ctx);
+  const expected = new Map([
+    ['z-ai/glm-5.3-flash', { provider: 'openrouter_paid', free: false }],
+    ['nvidia/nemotron-3.5-lightning:free', { provider: 'openrouter', free: true }],
+    ['nvidia/nemotron-3-ultra-550b-a55b:free', { provider: 'openrouter', free: true }],
+  ]);
+  assert.equal(ctx.featured.length, expected.size);
+  for (const model of ctx.featured) {
+    const checked = expected.get(model.apiId);
+    assert.ok(checked, model.apiId);
+    assert.equal(model.provider, checked.provider);
+    assert.equal(model.isFree, checked.free);
+    assert.ok(ctx.registry[model.provider]);
+  }
+  assert.equal(ctx.registry.atria, undefined);
+  assert.equal(ctx.keys.atria, undefined);
+  assert.equal(ctx.fallbacks.atria, undefined);
+  for (const path of ['js/config.js', 'js/keys.js', 'index.html', 'docs/index.html']) {
+    assert.doesNotMatch(source(path), /atria-dawn|api\.atria-asi\.ai|keyAtria|Atria Dawn/i, path);
+  }
+});
