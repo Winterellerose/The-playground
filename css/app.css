@@ -2461,3 +2461,106 @@ header {
     font-size: 0.58rem;
   }
 }
+
+/* ── Landing screen ── */
+.landing {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 500;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-7);
+  cursor: pointer;
+  transition: opacity var(--dur-slow) var(--ease);
+}
+.landing.fading {
+  opacity: 0;
+  pointer-events: none;
+}
+.landing-inner {
+  max-width: 600px;
+  width: 100%;
+  text-align: center;
+}
+.landing-prism {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto var(--space-6);
+  filter: drop-shadow(0 0 24px var(--paid-glow));
+  animation: prismSpin 12s linear infinite;
+}
+@keyframes prismSpin {
+  to { transform: rotate(360deg); }
+}
+.landing-label {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  letter-spacing: 0.38em;
+  text-transform: uppercase;
+  margin-bottom: var(--space-4);
+}
+.landing-title {
+  font-family: var(--font-display);
+  font-weight: 400;
+  font-size: clamp(3rem, 10vw, 5.5rem);
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--text);
+  margin-bottom: var(--space-8);
+}
+.landing-title em {
+  font-style: italic;
+  background: linear-gradient(105deg, var(--text) 15%, var(--accent) 45%, var(--free) 75%, var(--paid) 100%);
+  -webkit-background-clip: text; background-clip: text;
+  -webkit-text-fill-color: transparent; color: transparent;
+}
+.landing-bar {
+  height: 3px;
+  width: 100%;
+  background: var(--surface-raised);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: var(--space-4);
+}
+.landing-bar-fill {
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, var(--accent), var(--free), var(--paid));
+  border-radius: 2px;
+  animation: fill 1.1s cubic-bezier(0.65, 0.05, 0.36, 1) forwards;
+}
+@keyframes fill { to { width: 100%; } }
+.landing-meta {
+  display: flex;
+  justify-content: space-between;
+  font-family: var(--font-mono);
+  font-size: 0.68rem;
+  color: var(--text-muted);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.landing-enter {
+  opacity: 0;
+  margin-top: var(--space-6);
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  color: var(--text-faint);
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  animation: enterFade 0.4s var(--ease) 1.2s forwards;
+}
+@keyframes enterFade { to { opacity: 1; } }
+.landing-enter::before,
+.landing-enter::after {
+  content: "";
+  display: inline-block;
+  width: 20px;
+  height: 1px;
+  background: var(--text-faint);
+  vertical-align: middle;
+  margin: 0 var(--space-2);
+}
