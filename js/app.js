@@ -73,6 +73,7 @@ window.addEventListener('resize', () => {
   renderSidebar();
   if (activeChatId && getActiveChat()) loadChat(activeChatId);
   else resetWelcome();
+  if (chatRecoveryBlocked) showError('Saved chats could not be read. They have NOT been overwritten. Open Settings and use Recover saved chats.');
   syncChatPromptUI();
   initImageDrop();
   syncSearchUI();

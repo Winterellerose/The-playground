@@ -18,7 +18,7 @@ const LOCK_FILE = join(ROOT, 'vendor-lock.json');
 
 const VENDORS = [
   { name: 'marked', file: 'marked.umd.js', pkg: 'marked@15.0.7', extract: 'lib/marked.umd.js' },
-  { name: 'dompurify', file: 'purify.min.js', pkg: 'dompurify@3.2.4', extract: 'dist/purify.min.js' },
+  { name: 'dompurify', file: 'purify.min.js', pkg: 'dompurify@3.4.18', extract: 'dist/purify.min.js' },
   // highlight.js: npm package has source only; built min is generated at release
   // CSS theme is included in npm package
   {
@@ -111,7 +111,7 @@ async function main() {
 
   if (hasError) {
     console.error('\n⚠️  Vendor verification FAILED');
-    console.error('Run: npm install marked@15.0.7 dompurify@3.2.4 highlight.js@11.11.1');
+    console.error('Run: npm install marked@15.0.7 dompurify@3.4.18 highlight.js@11.11.1');
     console.error('Then copy files from node_modules to js/vendor/');
     process.exit(1);
   }

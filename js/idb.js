@@ -22,16 +22,16 @@ async function idbPut(id, value) {
   return new Promise((resolve, reject) => {
     const t = db.transaction('attachments', 'readwrite');
     t.objectStore('attachments').put(value, id);
-    t.oncomplete = resolve;
-    t.onerror = () => reject(t.error);
+    t.oncomplete = () => { db.close(); resolve(); };
+    t.onerror = t.onabort = () => { db.close(); reject(t.error); };
   });
 }
 async function idbGet(id) {
   const db = await idbOpen();
   return new Promise((resolve, reject) => {
     const r = db.transaction('attachments').objectStore('attachments').get(id);
-    r.onsuccess = () => resolve(r.result);
-    r.onerror = () => reject(r.error);
+    r.onsuccess = () => { db.close(); resolve(r.result); };
+    r.onerror = () => { db.close(); reject(r.error); };
   });
 }
 async function idbDelete(id) {
@@ -39,8 +39,8 @@ async function idbDelete(id) {
   return new Promise((resolve, reject) => {
     const t = db.transaction('attachments', 'readwrite');
     t.objectStore('attachments').delete(id);
-    t.oncomplete = resolve;
-    t.onerror = () => reject(t.error);
+    t.oncomplete = () => { db.close(); resolve(); };
+    t.onerror = t.onabort = () => { db.close(); reject(t.error); };
   });
 }
 function idbRef(x) {
@@ -69,19 +69,26 @@ async function moveLargeImages(chat) {
       }
     }
 }
+// Hydration is presentation-only: never replace or delete canonical refs.
 async function hydrateImages(chat) {
-  for (const m of chat.messages || [])
-    for (let i = 0; i < (m.images || []).length; i++)
-      if (idbRef(m.images[i])) {
-        try {
-          const data = await idbGet(m.images[i].idb);
-          if (typeof data === 'string') m.images[i] = data;
-          else m.images.splice(i--, 1);
-        } catch {
-          idbWarn();
-          m.images.splice(i--, 1);
-        }
-      }
+  return { ...chat, messages: await hydrateHistImages(chat.messages || []) };
+}
+async function pruneStoredImages(liveChats) {
+  const keep = new Set(liveChats.flatMap(c => (c.messages || []).flatMap(m =>
+    (m.images || []).filter(idbRef).map(x => x.idb))));
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('attachments', 'readwrite');
+    const request = tx.objectStore('attachments').openCursor();
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (!cursor) return;
+      if (!keep.has(cursor.key)) cursor.delete();
+      cursor.continue();
+    };
+    tx.oncomplete = () => { db.close(); resolve(); };
+    tx.onerror = tx.onabort = () => { db.close(); reject(tx.error); };
+  });
 }
 /* Resolve IndexedDB image refs on a COPY of wire history. The request builder
    needs data-URL strings, but the live chat objects must keep their refs

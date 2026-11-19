@@ -65,13 +65,19 @@ const scriptBlockRegex = new RegExp(
 );
 const scriptBlockMatch = html.match(scriptBlockRegex);
 if (!scriptBlockMatch) fail('script block not found in index.html (check line endings / order)');
-html = html.replace(scriptBlockMatch[0],
+html = html.replace(scriptBlockMatch[0], () =>
   '<!-- built from ' + ORDER.length + ' files — edit the sources, not this file -->\n<script>\n' + appJs + '\n</script>');
 
 /* Post-inline checks ignore HTML comments. */
 const stripComments = s => s.replace(/<!--[\s\S]*?-->/g, '');
 if (/<script\s+src=/i.test(stripComments(html))) fail('a <script src> tag survived inlining');
 if (/<link(?![^>]+fonts\.googleapis)[^>]+stylesheet/i.test(stripComments(html))) fail('the stylesheet <link> survived inlining');
+
+// Parse the actual inline script bodies, not only the pre-inlining bundle.
+// Replacement-string tokens such as $' must never corrupt the shipped HTML.
+for (const [, script] of html.matchAll(/<script>([\s\S]*?)<\/script>/g)) {
+  try { new Function(script) } catch (error) { fail('inlined script does not parse: ' + error.message) }
+}
 
 /* Tighten CSP for production artifact. */
 html = html.replace("script-src 'unsafe-inline' 'self'", "script-src 'unsafe-inline'");

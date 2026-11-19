@@ -1,51 +1,19 @@
 /* ═══ smoke.js — headless browser integration test ═══
    Runs against the built docs/index.html via Playwright.
-   Usage: node tests/smoke.js (requires: npx playwright install chromium) */
+   Usage: npm run test:browser (requires: npx playwright install chromium) */
 
 import { test, expect } from '@playwright/test';
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { spawn } from 'node:child_process';
-
-const __dirname = fileURLToPath(new URL('.', import.meta.url));
-const ROOT = join(__dirname, '..');
-const DOCS = join(ROOT, 'docs');
-
-/* Serve docs/ on a random port */
-let server;
-let baseURL;
-
-async function startServer() {
-  return new Promise((resolve, reject) => {
-    server = spawn('python3', ['-m', 'http.server', '0'], { cwd: DOCS });
-    server.stdout.on('data', d => {
-      const match = d.toString().match(/Serving HTTP on .*:(\d+)/);
-      if (match) {
-        baseURL = `http://localhost:${match[1]}`;
-        resolve(baseURL);
-      }
-    });
-    server.stderr.on('data', d => reject(new Error(d.toString())));
-    setTimeout(() => reject(new Error('Server start timeout')), 5000);
-  });
-}
-
-function stopServer() {
-  return new Promise(resolve => {
-    if (server) server.kill();
-    resolve();
-  });
-}
+const baseURL = 'http://127.0.0.1:8001';
 
 test.describe('The Playground — Smoke Test', () => {
-  test.beforeAll(async () => {
-    await startServer();
-    console.log(`🌐 Serving at ${baseURL}`);
-  });
-
-  test.afterAll(async () => {
-    await stopServer();
+  test.beforeEach(async ({ page }) => {
+    // Deterministic offline shell tests: no real provider keys or external traffic.
+    await page.route('**/*', route => {
+      if (new URL(route.request().url()).hostname === '127.0.0.1') return route.continue();
+      if (route.request().resourceType() === 'fetch') return route.fulfill({ json: { data: [] } });
+      return route.fulfill({ status: 200, body: '' });
+    });
+    await page.addInitScript(() => localStorage.setItem('key_openrouter', 'test-only'));
   });
 
   test('loads without console errors', async ({ page }) => {
@@ -63,9 +31,7 @@ test.describe('The Playground — Smoke Test', () => {
 
     if (errors.length) {
       console.log('Console errors:', errors);
-      // Filter out expected CSP reports from inline scripts in dev
-      const realErrors = errors.filter(e => !e.includes('Content Security Policy'));
-      expect(realErrors).toHaveLength(0);
+      expect(errors).toHaveLength(0);
     }
   });
 
@@ -83,14 +49,14 @@ test.describe('The Playground — Smoke Test', () => {
   test('opens model picker', async ({ page }) => {
     await page.goto(baseURL, { waitUntil: 'networkidle' });
     await page.click('#landing');
-    await page.click('[data-act="open-model-picker"]');
+    await page.locator('[data-act="open-model-picker"]').first().click();
 
     await expect(page.locator('.mp-modal')).toBeVisible();
     await expect(page.locator('#mpBody')).toContainText('Nemotron');
     await expect(page.locator('#mpBody')).toContainText('GLM');
 
     // Close picker
-    await page.click('[data-act="close-model-picker"]');
+    await page.locator('.mp-close').click();
     await expect(page.locator('.mp-modal')).toBeHidden();
   });
 
@@ -99,13 +65,13 @@ test.describe('The Playground — Smoke Test', () => {
     await page.click('#landing');
     await page.click('[data-act="open-settings"]');
 
-    await expect(page.locator('.st-modal')).toBeVisible();
+    await expect(page.locator('#stOverlay .st-modal')).toBeVisible();
     await expect(page.locator('#freeKeys')).toBeVisible();
     await expect(page.locator('#paidKeys')).toBeVisible();
 
     // Close settings
-    await page.click('[data-act="close-settings"]');
-    await expect(page.locator('.st-modal')).toBeHidden();
+    await page.locator('#stOverlay .st-close').click();
+    await expect(page.locator('#stOverlay .st-modal')).toBeHidden();
   });
 
   test('sidebar toggle works', async ({ page }) => {
@@ -113,15 +79,15 @@ test.describe('The Playground — Smoke Test', () => {
     await page.click('#landing');
 
     // Sidebar should be open on desktop
-    await expect(page.locator('#sidebar')).toHaveClass(/open/);
+    await expect(page.locator('#sidebar')).not.toHaveClass(/collapsed/);
 
     // Collapse
     await page.click('[data-act="toggle-sidebar-desktop"]');
-    await expect(page.locator('#sidebar')).not.toHaveClass(/open/);
+    await expect(page.locator('#sidebar')).toHaveClass(/collapsed/);
 
     // Expand
     await page.click('[data-act="toggle-sidebar-desktop"]');
-    await expect(page.locator('#sidebar')).toHaveClass(/open/);
+    await expect(page.locator('#sidebar')).not.toHaveClass(/collapsed/);
   });
 
   test('typing in input works', async ({ page }) => {
@@ -149,8 +115,8 @@ test.describe('The Playground — Smoke Test', () => {
     await page.goto(baseURL, { waitUntil: 'networkidle' });
 
     // Wait for SW registration
-    await page.waitForFunction(() => navigator.serviceWorker.ready, { timeout: 5000 });
-    const reg = await page.evaluate(() => navigator.serviceWorker.ready);
+    await page.waitForFunction(async () => !!(await navigator.serviceWorker.getRegistration()), null, { timeout: 5000 });
+    const reg = await page.evaluate(async () => !!(await navigator.serviceWorker.ready));
     expect(reg).toBeTruthy();
   });
 
@@ -168,4 +134,28 @@ test.describe('The Playground — Smoke Test', () => {
 
     expect(cspViolations).toHaveLength(0);
   });
+  test('damaged history is preserved and recovery is accessible', async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem('chat_history', '{damaged'));
+    await page.goto(baseURL);
+    await page.click('#landing');
+    await page.click('[data-act="open-settings"]');
+    await expect(page.locator('[data-act="recover-chats"]')).toBeVisible();
+    expect(await page.evaluate(() => localStorage.getItem('chat_history'))).toBe('{damaged');
+    expect(await page.evaluate(() => saveChats())).toBe(false);
+    expect(await page.evaluate(() => localStorage.getItem('chat_history'))).toBe('{damaged');
+  });
+
+  test('configured provider origins are not blocked by CSP', async ({ page }) => {
+    await page.goto(baseURL);
+    const result = await page.evaluate(async () => {
+      const violations = [];
+      document.addEventListener('securitypolicyviolation', e => violations.push(e.blockedURI));
+      for (const url of ['https://openrouter.ai/api/v1/models', 'https://api.z.ai/api/paas/v4/models']) {
+        await fetch(url);
+      }
+      return violations;
+    });
+    expect(result).toEqual([]);
+  });
+
 });

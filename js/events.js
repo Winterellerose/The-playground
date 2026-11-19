@@ -6,6 +6,7 @@
    order never matters. */
 
 const ACT = {
+  'recover-chats': () => recoverSavedChats(),
   'new-chat': () => newChat(),
   'close-sidebar': () => closeSidebar(),
   'toggle-sidebar-desktop': () => toggleDesktopSidebar(),

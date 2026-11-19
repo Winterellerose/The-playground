@@ -142,13 +142,21 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
   // silently blow past the model's limit. Count them here; image refs are
   // resolved on a copy so the live messages keep their storage-friendly form.
   const sysChars = (($('sysPrompt') && $('sysPrompt').value.trim().length) || 0) + chatSysText().length + 160; // composeSys date stamp + section labels
-  const hist = await hydrateHistImages(cleanHistory(c, targetIdx, sysChars + (cfg.webContext || '').length));
+  let hist;
+  try {
+    hist = await hydrateHistImages(cleanHistory(c, targetIdx, sysChars + (cfg.webContext || '').length));
+  } catch (error) {
+    if (gen === streamGen) showError(error.message);
+    return { content: '', thinking: '', meta: null, aborted: true };
+  }
+  if (gen !== streamGen || signal.aborted) return { content: '', thinking: '', meta: null, aborted: true };
   const { h, rb } = buildRequest(cfg, hist);
   const { pid, model: m } = cfg;
   let full = '',
     think = '',
     meta = null,
     finish = null,
+    streamError = null,
     t0 = performance.now();
   let pulse = null,
     block = null,
@@ -161,7 +169,7 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
       method: 'POST',
       headers: h,
       body: JSON.stringify(rb),
-      signal: abortCtrl.signal,
+      signal,
     });
     if (!res.ok) {
       const et = await res.text();
@@ -223,6 +231,9 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
         evt = JSON.parse(data);
       } catch {
         return;
+      }
+      if (evt.error || evt.type === 'error') {
+        throw new Error(evt.error?.message || evt.message || 'Provider stream failed');
       }
       if (evt.usage) {
         meta = meta || {};
@@ -327,6 +338,7 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
         };
       return { content: '', thinking: '', meta: null, aborted: true };
     }
+    streamError = e.message || 'Response interrupted';
     if (e.name !== 'AbortError') {
       let em = e.message;
       // With a relay configured, a dead fetch means the relay is down — the
@@ -354,7 +366,7 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
   }
   body.classList.remove('streaming-cursor');
   const ms = performance.now() - t0;
-  const truncated = (finish === 'length' || finish === 'max_tokens') && !!(full || think);
+  const truncated = (!!streamError || finish === 'length' || finish === 'max_tokens') && !!(full || think);
   if (finish === 'length' || finish === 'max_tokens')
     logRot(
       `⚠️ ${REG[pid].name} hit the max output tokens limit — answer cut off. Raise "Max output tokens" in Settings`,
@@ -373,7 +385,7 @@ async function doStream(c, msgDiv, tried = [], gen = streamGen, regenIdx) {
     if (truncated) {
       const note = document.createElement('div');
       note.className = 'truncated-note';
-      note.textContent =
+      note.textContent = streamError ? '⚠️ Response interrupted: ' + streamError :
         '⚠️ ' +
         (cfg.thinking && m.thinking === true && !m.adaptive
           ? 'Response cut off — the thinking budget and the answer share the same max output tokens limit. Raise it in Settings.'
@@ -479,7 +491,7 @@ async function runCompletion(c, regenIdx) {
       );
     // One cheap non-streaming call → 5-word title + 3 clickable follow-up chips.
     // Skip it when the user manually stopped (partial answer); not worth a call.
-    if (!result.stopped && persisted) generateExtras(c, asstIdx);
+    if (!result.stopped && !result.truncated && persisted) generateExtras(c, asstIdx);
   } else {
     d.remove(); // never poison history with empty assistant turns
   }

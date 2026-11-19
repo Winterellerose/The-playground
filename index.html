@@ -5,28 +5,13 @@
     <link rel="apple-touch-icon" href="icons/icon-192.png" />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <!--
-  CSP notes:
-  • This app ships as a set of external js/*.js files (see the script tags
-    below), so 'self' on script-src covers them. 'unsafe-inline' is retained because
-    the streaming layer injects <script> blocks at runtime for provider callbacks;
-    without it the app breaks. The real defence is connect-src, which pins every
-    host the app may talk to (REG providers + search APIs + local relay servers) so
-    that even if script gets injected it cannot exfiltrate keys to an arbitrary
-    endpoint. When you add a provider in js/config.js, add its origin to connect-src
-    here as well.
-  • img-src allows 'self' (local icons), data: (base64 attachments you've already
-    read locally), and https: (markdown images in model output / search results).
-    Images are a rendering surface, not a network-request channel — the exfil risk
-    they carry is negligible compared to the connect-src surface this CSP locks down.
-  • style-src keeps 'unsafe-inline' because the app sets el.style.* and
-    document.styleSheets in a few places (syntax-highlighting theme swap,
-    preview-strip sizing). A full build step could move those to app.css and
-    drop the inline rule, but for a single-artifact ship it's the pragmatic call.
--->
+    <!-- CSP: dev scripts use self; the portable build inlines scripts.
+      Provider and custom relay origins must be listed explicitly in connect-src.
+      Inline styles support dynamic UI. CSP is defense-in-depth, not a substitute
+      for sanitization: remote images and allowed providers are network channels. -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'unsafe-inline' 'self'; style-src 'unsafe-inline' 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:; connect-src https://api.groq.com https://api.cerebras.ai https://generativelanguage.googleapis.com https://api.mistral.ai https://api.cohere.com https://integrate.api.nvidia.com http://localhost:8765 http://127.0.0.1:8765 https://nvidia-relay.genesisrosario159.workers.dev https://api.deepseek.com https://api.anthropic.com https://api.openai.com https://api.sambanova.ai https://api.atria-asi.ai https://api.tavily.com https://google.serper.dev https://api.search.brave.com http://localhost:11434 http://localhost:1234; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'"
+      content="default-src 'none'; script-src 'unsafe-inline' 'self'; style-src 'unsafe-inline' 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: https:; connect-src 'self' https://openrouter.ai https://api.z.ai https://api.groq.com https://api.cerebras.ai https://generativelanguage.googleapis.com https://api.mistral.ai https://api.cohere.com https://integrate.api.nvidia.com http://localhost:8765 http://127.0.0.1:8765 https://nvidia-relay.genesisrosario159.workers.dev https://api.deepseek.com https://api.anthropic.com https://api.openai.com https://api.sambanova.ai https://api.atria-asi.ai https://api.tavily.com https://google.serper.dev https://api.search.brave.com http://localhost:11434 http://localhost:1234; worker-src 'self'; manifest-src 'self'; base-uri 'none'; form-action 'none'"
     />
     <title>The Playground — Multi-Provider AI Studio</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -133,6 +118,7 @@
             </button>
           </div>
           <div class="st-body">
+            <button data-act="recover-chats">Recover saved chats</button>
             <div>
               <div class="sb-sect-label">Generation</div>
               <div style="display: flex; flex-direction: column; gap: 10px">

@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [master]
   pull_request:
-    branches: [main]
+    branches: [master]
 
 permissions:
   contents: read
@@ -24,6 +24,9 @@ jobs:
 
       - name: Install dependencies
         run: npm ci
+
+      - name: Lint
+        run: npm run lint
 
       - name: Verify vendored libraries
         run: npm run verify:vendor
@@ -46,11 +49,11 @@ jobs:
       - name: Verify CSP in built artifact
         run: |
           # Ensure 'self' was stripped from script-src and style-src in the build
-          if grep -q "script-src.*'self'" docs/index.html; then
+          if grep -q "script-src[^;]*'self'" docs/index.html; then
             echo "❌ Dev CSP ('self') survived in built artifact"
             exit 1
           fi
-          if grep -q "style-src.*'self'" docs/index.html; then
+          if grep -q "style-src[^;]*'self'" docs/index.html; then
             echo "❌ Dev CSP ('self') survived in built artifact"
             exit 1
           fi
@@ -76,10 +79,10 @@ jobs:
         run: npm run build
 
       - name: Install Playwright
-        run: npx playwright install --with-deps chromium
+        run: npx --no-install playwright install --with-deps chromium
 
       - name: Run smoke test
-        run: node tests/smoke.js
+        run: npm run test:browser
 
   deploy-preview:
     runs-on: ubuntu-latest
@@ -88,6 +91,10 @@ jobs:
     if: github.event_name == 'pull_request'
     steps:
       - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm run build
       - name: Upload built artifact for preview
         uses: actions/upload-artifact@v4
         with:

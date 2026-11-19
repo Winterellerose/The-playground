@@ -20,8 +20,10 @@ https
           process.exit(1);
         }
       } catch (e) {
-        console.warn('model audit warning:', e.message);
+        console.error('model audit failed:', e.message);
+        process.exitCode = 2;
       }
     });
   })
-  .on('error', e => console.warn('model audit warning (network):', e.message));
+  .on('error', e => { console.error('model audit failed (network):', e.message); process.exitCode = 2; })
+  .setTimeout(30000, function () { this.destroy(new Error('Catalog request timed out')); });

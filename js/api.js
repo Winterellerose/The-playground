@@ -125,9 +125,10 @@ function cleanHistory(c, targetIdx, extraChars = 0) {
     const max = Math.max(1, (ctx - (parseInt($('maxTok').value) || 8192)) * 0.95);
     const tok = () =>
       Math.ceil(extraChars / 4) +
-      h.reduce((n, x) => n + Math.ceil(((x.content || '') + (x.thinking || '') + fileChars(x)).length / 4), 0);
+      h.reduce((n, x) => n + Math.ceil(((x.content || '').length + (x.thinking || '').length + fileChars(x)) / 4), 0);
     while (h.length > 1 && tok() > max) h.shift();
     if (h[0] && h[0].role === 'assistant') h.shift();
+    if (tok() > max) throw new Error('This message, its attachments, or system prompt exceed the model context limit. Shorten them or choose a larger-context model.');
   }
   return h.map(x => {
     const o = { role: x.role, content: x.content || '' };

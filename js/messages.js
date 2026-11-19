@@ -28,6 +28,7 @@ function addUserMsg(text, idx, scroll = true, images, files) {
   d.className = 'msg user';
   d.dataset.idx = idx;
   const safeImages = Array.isArray(images) ? images.map(safeImageDataUrl).filter(Boolean) : [];
+  const storedImages = Array.isArray(images) ? images.filter(idbRef) : [];
   const imgHtml = safeImages.length
     ? `<div class="msg-images">${safeImages.map(u => `<img src="${esc(u)}" alt="attachment">`).join('')}</div>`
     : '';
@@ -39,6 +40,23 @@ function addUserMsg(text, idx, scroll = true, images, files) {
     : `<div class="msg-body" data-raw="${esc((files || []).map(f => f.name).join(', '))}" style="display:none"></div>`;
   d.innerHTML = `<div class="msg-header"><span class="msg-role user">You</span><div class="msg-actions"><span class="copied-toast">Copied</span><button data-act="copy-msg" title="Copy" aria-label="Copy message">${COPY_SVG}</button><button class="act-edit" data-act="edit-msg" data-idx="${idx}" title="Edit" aria-label="Edit message">${EDIT_SVG}</button></div></div>${imgHtml}${fileHtml}${bodyHtml}`;
   chatWrap.appendChild(d);
+  if (storedImages.length) hydrateHistImages([{ images: storedImages }]).then(([message]) => {
+    if (!d.isConnected) return;
+    let box = d.querySelector('.msg-images');
+    if (!box) {
+      box = document.createElement('div');
+      box.className = 'msg-images';
+      d.appendChild(box);
+    }
+    for (const data of message.images) {
+      const safe = safeImageDataUrl(data);
+      if (!safe) continue;
+      const image = document.createElement('img');
+      image.src = safe;
+      image.alt = 'attachment';
+      box.appendChild(image);
+    }
+  });
   highlight(d);
   if (scroll) scrollToBottom();
 }

@@ -211,12 +211,12 @@ async function main() {
     const withRelay = run({ pg_relay_nvidia: 'http://localhost:8765/' });
     eq(
       withRelay.relayUrl('nvidia', 'https://integrate.api.nvidia.com/v1/chat/completions'),
-      'http://localhost:8765/chat/completions',
-      'relay root replaces origin + /v1'
+      'http://localhost:8765/v1/chat/completions',
+      'relay root preserves upstream /v1'
     );
     eq(
       withRelay.relayUrl('nvidia', 'https://integrate.api.nvidia.com/v1/models'),
-      'http://localhost:8765/models',
+      'http://localhost:8765/v1/models',
       'the list endpoint is rewritten too'
     );
     eq(withRelay.relayNeeded('nvidia'), false, 'a stored relay satisfies the requirement');
@@ -224,7 +224,7 @@ async function main() {
     const v1 = run({ pg_relay_nvidia: 'http://localhost:8787/v1' });
     eq(
       v1.relayUrl('nvidia', 'https://integrate.api.nvidia.com/v1/chat/completions'),
-      'http://localhost:8787/chat/completions',
+      'http://localhost:8787/v1/chat/completions',
       'a root written with or without /v1 means the same relay'
     );
 
@@ -249,7 +249,7 @@ async function main() {
       }
     );
     await probe.testKey('nvidia');
-    eq(hit, 'http://localhost:8765/models', 'the key test is sent through the relay');
+    eq(hit, 'http://localhost:8765/v1/models', 'the key test is sent through the relay');
     eq(probe.__els.test_nvidia.textContent, 'OK ✓', 'a relayed 2xx is believed');
   }
 

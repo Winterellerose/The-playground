@@ -256,7 +256,7 @@ function relayUrl(pid, url) {
   if (!base) return url;
   try {
     const u = new URL(url);
-    return base + u.pathname.replace(/^\/v1/, '') + (u.search || '');
+    return base + u.pathname + (u.search || '');
   } catch {
     return url;
   }

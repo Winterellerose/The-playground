@@ -2,25 +2,26 @@
 /* ═══ chats.js — chat CRUD, sidebar, per-chat prompts, import/export ═══ */
 
 /* ── Chats ── */
-let saveSeq = 0; // a newer saveChats() supersedes the deferred post-migration write
+let attachmentSaveQueue = Promise.resolve();
 function saveChats() {
-  const active = getActiveChat();
-  if (active) {
-    const seq = ++saveSeq;
-    moveLargeImages(active).then(() => {
-      if (seq !== saveSeq) return;
-      try {
-        localStorage.setItem('chat_history', JSON.stringify(chats));
-      } catch {}
-    });
-  }
-  try {
-    localStorage.setItem('chat_history', JSON.stringify(chats));
-    return true;
-  } catch (e) {
-    logRot('Storage full — message was not saved; export & prune old chats', 'err');
+  if (chatRecoveryBlocked) {
+    showError('Saved chat data needs recovery. Download it from Settings before resetting storage.');
     return false;
   }
+  let saved = false;
+  try {
+    localStorage.setItem('chat_history', JSON.stringify(chats));
+    saved = true;
+  } catch {
+    logRot('Storage full — export & prune old chats; image storage migration will be retried', 'err');
+  }
+  // Serialize migration and cleanup. Only prune after durable metadata exists.
+  attachmentSaveQueue = attachmentSaveQueue.then(async () => {
+    for (const chat of chats) await moveLargeImages(chat);
+    localStorage.setItem('chat_history', JSON.stringify(chats));
+    await pruneStoredImages(chats);
+  }).catch(() => logRot('Could not finish saving attachments — export a backup before reloading', 'warn'));
+  return saved;
 }
 function renderSidebar() {
   if (!document || !$('sbList')) return;
@@ -139,9 +140,7 @@ async function loadChat(id) {
 
   const hasStoredImages = (chat.messages || []).some(message => (message.images || []).some(idbRef));
 
-  if (hasStoredImages) {
-    await hydrateImages(chat);
-  }
+  const displayChat = hasStoredImages ? await hydrateImages(chat) : chat;
 
   const superseded = version !== chatLoadVersion || activeChatId !== id || !chats.includes(chat);
 
@@ -154,7 +153,7 @@ async function loadChat(id) {
   chatWrap.replaceChildren(welcome);
   welcome.style.display = 'none';
 
-  chat.messages.forEach((message, index) => {
+  displayChat.messages.forEach((message, index) => {
     if (message.role === 'user') {
       addUserMsg(message.content, index, false, message.images, message.files);
     } else {

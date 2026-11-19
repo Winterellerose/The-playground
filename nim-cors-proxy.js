@@ -1,151 +1,57 @@
 #!/usr/bin/env node
-/* ═══ nim-cors-proxy.js — NVIDIA NIM CORS Relay ═════════════════════════════
-   NVIDIA's integrate.api.nvidia.com sends NO Access-Control-Allow-Origin header,
-   so browsers block ALL calls (key test, /models, chat). This tiny relay adds
-   the required headers and forwards requests.
+// Local NVIDIA relay. See README.md for hosted-origin configuration.
+import { createServer, request as httpRequest } from 'node:http';
+import { request as httpsRequest } from 'node:https';
+import { allowedOrigin, corsHeaders, allowedRoute, stripHopHeaders } from './relay-policy.js';
 
-   Usage:
-     npx nim-cors-proxy.js           # runs on http://localhost:8765
-     npx nim-cors-proxy.js --port 9999
-
-   Then in The Playground: Settings → NVIDIA NIM → CORS relay → http://localhost:8765
-
-   Deploy to Cloudflare Workers (free):
-     1. wrangler init nim-cors-proxy
-     2. Replace index.js with this file (adapt for Workers runtime)
-     3. wrangler deploy
-     4. Use the workers.dev URL as the relay
-   ════════════════════════════════════════════════════════════════════════════ */
-
-import { createServer } from 'node:http';
-import { parse } from 'node:url';
-import { createHash } from 'node:crypto';
-
-const TARGET = 'https://integrate.api.nvidia.com';
-const DEFAULT_PORT = 8765;
-const ALLOWED_ORIGINS = [
-  'http://localhost:8000', // npm run dev
-  'http://127.0.0.1:8000',
-  'http://localhost:8765', // self
-  'http://127.0.0.1:8765',
-  // file:// origin is 'null' — handled separately
-];
-
-function parseArgs() {
-  const args = process.argv.slice(2);
-  const port = args.includes('--port') ? parseInt(args[args.indexOf('--port') + 1], 10) : DEFAULT_PORT;
-  const target = args.includes('--target') ? args[args.indexOf('--target') + 1] : TARGET;
-  return { port, target };
+const args = process.argv.slice(2);
+function option(name, fallback) {
+  const index = args.indexOf(name);
+  if (index < 0) return fallback;
+  if (!args[index + 1] || args[index + 1].startsWith('--')) throw Error(`Missing value for ${name}`);
+  return args[index + 1];
 }
-
-function corsHeaders(origin) {
-  const h = {
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Authorization, Content-Type, Accept, X-Requested-With',
-    'Access-Control-Allow-Credentials': 'false',
-    'Access-Control-Max-Age': '86400',
-  };
-  // file:// origins send 'null' — echo it back
-  if (origin === 'null' || ALLOWED_ORIGINS.includes(origin)) {
-    h['Access-Control-Allow-Origin'] = origin;
-  } else if (origin?.startsWith('http://localhost:') || origin?.startsWith('http://127.0.0.1:')) {
-    h['Access-Control-Allow-Origin'] = origin; // allow any localhost port
-  }
-  return h;
+const port = Number(option('--port', '8765'));
+if (!Number.isInteger(port) || port < 0 || port > 65535) throw Error('Invalid port');
+const host = option('--host', '127.0.0.1');
+const target = new URL(option('--target', 'https://integrate.api.nvidia.com'));
+if (target.protocol !== 'https:' && !(target.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(target.hostname))) {
+  throw Error('Target must use HTTPS (HTTP is permitted only for loopback testing)');
 }
-
-function log(req, res, start, body = '') {
-  const ms = Date.now() - start;
-  const status = res.statusCode;
-  const color = status >= 400 ? '\x1b[31m' : status >= 300 ? '\x1b[33m' : '\x1b[32m';
-  const dim = '\x1b[2m';
-  const reset = '\x1b[0m';
-  console.log(`${dim}[${new Date().toISOString()}]${reset} ${req.method} ${req.url} ${color}${status}${reset} ${ms}ms`);
-  if (body && process.env.DEBUG) console.log(dim + body.slice(0, 500) + reset);
-}
-
-const { port, target } = parseArgs();
-const targetUrl = new URL(target);
-
-console.log(`🚀 NVIDIA NIM CORS Relay`);
-console.log(`   Target: ${target}`);
-console.log(`   Listening: http://localhost:${port}`);
-console.log(`   Configure in Playground: Settings → NVIDIA NIM → CORS relay → http://localhost:${port}`);
-console.log('');
-
-const server = createServer(async (req, res) => {
-  const start = Date.now();
+const server = createServer((req, res) => {
   const origin = req.headers.origin || 'null';
-  const cors = corsHeaders(origin);
-
-  // Preflight
-  if (req.method === 'OPTIONS') {
-    Object.entries(cors).forEach(([k, v]) => res.setHeader(k, v));
-    res.writeHead(204);
-    return res.end();
+  if (!allowedOrigin(origin, process.env.ALLOWED_ORIGINS)) {
+    res.writeHead(403); res.end('Origin not allowed'); return;
   }
-
-  // Proxy the request
-  const parsed = parse(req.url, true);
-  const path = parsed.pathname + (parsed.search || '');
-
-  const options = {
-    hostname: targetUrl.hostname,
-    port: targetUrl.port || 443,
-    path,
+  const cors = corsHeaders(origin);
+  if (req.method === 'OPTIONS') { res.writeHead(204, cors); res.end(); return; }
+  // Assign pathname separately: a //host path must never change upstream host.
+  const url = new URL(target.origin);
+  url.pathname = req.url.split('?')[0];
+  url.search = req.url.includes('?') ? req.url.slice(req.url.indexOf('?')) : '';
+  if (!allowedRoute(req.method, url.pathname)) { res.writeHead(404, cors); res.end('Route not allowed'); return; }
+  const upstream = (url.protocol === 'https:' ? httpsRequest : httpRequest)(url, {
     method: req.method,
-    headers: {
-      ...req.headers,
-      host: targetUrl.hostname,
-      origin: target, // forward our origin to NVIDIA
-    },
-  };
-
-  // Remove hop-by-hop headers
-  delete options.headers['connection'];
-  delete options.headers['transfer-encoding'];
-
-  const proxyReq = require('node:https').request(options, proxyRes => {
-    Object.entries(cors).forEach(([k, v]) => res.setHeader(k, v));
-
-    // Copy response headers (except hop-by-hop)
-    Object.entries(proxyRes.headers).forEach(([k, v]) => {
-      if (!['connection', 'transfer-encoding', 'content-encoding'].includes(k.toLowerCase())) {
-        res.setHeader(k, v);
-      }
-    });
-
-    res.writeHead(proxyRes.statusCode);
-
-    let body = '';
-    proxyRes.on('data', chunk => {
-      body += chunk;
-      res.write(chunk);
-    });
-    proxyRes.on('end', () => {
-      res.end();
-      log(req, res, start, body);
-    });
+    headers: { ...stripHopHeaders(req.headers), origin: target.origin },
+  }, response => {
+    // Node forwards raw bytes, so keep Content-Encoding and Content-Length.
+    const headers = stripHopHeaders(response.headers);
+    for (const key of Object.keys(headers)) if (key.startsWith('access-control-')) delete headers[key];
+    res.writeHead(response.statusCode, { ...headers, ...cors });
+    response.on('error', () => res.destroy());
+    response.pipe(res); // Bounded memory and native backpressure.
   });
-
-  proxyReq.on('error', err => {
-    Object.entries(cors).forEach(([k, v]) => res.setHeader(k, v));
-    res.writeHead(502);
-    res.end(JSON.stringify({ error: 'Bad gateway', message: err.message }));
-    log(req, res, start, err.message);
+  upstream.setTimeout(120000, () => upstream.destroy(Error('Upstream timed out')));
+  upstream.on('error', error => {
+    if (res.destroyed) return;
+    if (res.headersSent) { res.destroy(error); return; }
+    res.writeHead(502, { ...cors, 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({ error: 'Bad gateway', message: error.message }));
   });
-
-  // Pipe request body
-  req.on('data', chunk => proxyReq.write(chunk));
-  req.on('end', () => proxyReq.end());
+  req.on('aborted', () => upstream.destroy());
+  req.on('error', () => upstream.destroy());
+  res.on('close', () => { if (!res.writableFinished) upstream.destroy(); });
+  req.pipe(upstream);
 });
-
-server.listen(port, () => {
-  console.log(`✅ Relay ready on http://localhost:${port}`);
-  console.log(`   Test: curl -H "Origin: http://localhost:8000" http://localhost:${port}/v1/models`);
-});
-
-process.on('SIGINT', () => {
-  console.log('\n👋 Shutting down...');
-  server.close(() => process.exit(0));
-});
+server.listen(port, host, () => console.log(`NVIDIA relay listening on http://${host}:${server.address().port}`));
+process.on('SIGINT', () => server.close(() => process.exit(0)));

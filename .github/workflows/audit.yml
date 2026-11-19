@@ -42,66 +42,24 @@ jobs:
           if [ $exit_code -eq 0 ]; then
             echo "status=clean" >> $GITHUB_OUTPUT
             echo "✅ Catalog is up to date"
-          else
+          elif [ $exit_code -eq 1 ]; then
             echo "status=drift" >> $GITHUB_OUTPUT
             echo "⚠️ Catalog drift detected"
             cat audit.log
+          else
+            echo "Catalog audit could not complete"
+            exit "$exit_code"
           fi
 
-      - name: Fetch live OpenRouter catalog
+      - name: Fetch and generate updated catalog
         if: steps.audit.outputs.status == 'drift' && github.event.inputs.create_pr == 'true'
-        id: fetch
         run: |
-          curl -sf https://openrouter.ai/api/v1/models | \
-            jq -r '.data[] | select(.id | endswith(":free")) | .id' | \
-            sort > live-free-models.txt
-          echo "count=$(wc -l < live-free-models.txt)" >> $GITHUB_OUTPUT
-          cat live-free-models.txt
-
-      - name: Generate updated config.js
-        if: steps.audit.outputs.status == 'drift' && github.event.inputs.create_pr == 'true'
-        id: generate
-        run: |
-          node << 'EOF'
-          const fs = require('fs');
-          const config = fs.readFileSync('js/config.js', 'utf8');
-          const liveModels = fs.readFileSync('live-free-models.txt', 'utf8')
-            .trim().split('\n').filter(Boolean);
-
-          // Find the OpenRouter free section and replace it
-          // This is a conservative replacement - only updates the or_free models
-          const newModels = liveModels.map((id, i) => {
-            const name = id.split('/').pop().replace(':free', '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-            const badge = name.length > 10 ? name.slice(0,10) : name;
-            return `"or-free-${i}": {
-    name: "${name}",
-    badge: "${badge}",
-    group: "or_free",
-    provider: "openrouter",
-    apiId: "${id}",
-    isFree: true,
-    intel: 3,
-    ctx: "—",
-    desc: "Free via OpenRouter."
-  }`;
-          }).join(',\n  ');
-
-          const replacement = `/* ── OpenRouter free ── */
-  // AUTO-UPDATED ${new Date().toISOString().slice(0,10)} — do not edit manually, run the audit workflow
-  ${newModels}`;
-
-          const updated = config.replace(
-            /\/\* ── OpenRouter free ── \*\/[\s\S]*?(?=\n  \/\* ──|\nconst GROUPS)/,
-            replacement
-          );
-
-          fs.writeFileSync('js/config.js', updated);
-          console.log('Updated js/config.js with', liveModels.length, 'free models');
-          EOF
+          curl --fail --show-error --max-time 30 https://openrouter.ai/api/v1/models -o /tmp/catalog.json
+          node scripts/update-models.js /tmp/catalog.json
 
       - name: Run tests to verify
         if: steps.audit.outputs.status == 'drift' && github.event.inputs.create_pr == 'true'
-        run: npm test
+        run: npm test && npm run build
 
       - name: Create Pull Request
         if: steps.audit.outputs.status == 'drift' && github.event.inputs.create_pr == 'true'

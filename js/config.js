@@ -539,19 +539,6 @@ const MODELS = {
     ctx: '128K',
     desc: 'Baidu preview model. FREE.',
   },
-  'gemma-4': {
-    name: 'Gemma 4 26B A4B',
-    badge: 'GEMMA 4',
-    group: 'or_free',
-    provider: 'openrouter',
-    apiId: 'google/gemma-4-26b-a4b-it:free',
-    isFree: true,
-    intel: 3,
-    ctx: '262K',
-    params: '26B/A4B',
-    vision: true,
-    desc: 'Google open multimodal MoE. FREE.',
-  },
   // (oss-20f removed 2026-08-28: openai/gpt-oss-20b:free was retired; the paid base and the Groq-hosted 20B remain.)
   /* ── Groq ── */
   'groq-oss120': {
